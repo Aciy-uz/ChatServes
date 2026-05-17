@@ -93,7 +93,9 @@
 <button onclick="sendMsg()">发送</button><br><br>
 <button onclick="markRead()">标记已读（填入发送者ID）</button>
 <button onclick="getHistory()">获取聊天记录</button>
-<button onclick="getUnread()">获取未读统计</button>
+<button onclick="getUnread()">获取未读统计</button><br><br>
+<input id="recallMsgId" placeholder="撤回的消息ID"><br><br>
+<button onclick="recallMsg()">撤回消息</button>
 <div id="chatBox" style="border:1px solid #ccc;height:300px;overflow-y:auto;padding:10px;margin:5px 0;"></div>
 <pre id="out7"></pre>
 <hr>
@@ -385,9 +387,9 @@ function connectWs() {
   socket.on('private_message', (msg) => {
     console.log('收到消息:', msg, 'myUserId:', myUserId, '类型:', typeof msg.senderId, typeof myUserId);
     if (Number(msg.senderId) === Number(myUserId)) {
-      appendChat(`[我 -> 用户${msg.receiverId}] ${msg.content}`, 'sent');
+      appendChat(`[ID:${msg.id}] [我 -> 用户${msg.receiverId}] ${msg.content}`, 'sent');
     } else {
-      appendChat(`[用户${msg.senderId} -> 我] ${msg.content}`, 'received');
+      appendChat(`[ID:${msg.id}] [用户${msg.senderId} -> 我] ${msg.content}`, 'received');
     }
   });
 
@@ -402,6 +404,10 @@ function connectWs() {
 
   socket.on('messages_read', ({ readerId }) => {
     appendChat(`用户${readerId} 已读你的消息`);
+  });
+
+  socket.on('message_recall', ({ messageId, senderId }) => {
+    appendChat(`[系统] 用户${senderId} 撤回了一条消息 (ID:${messageId})`);
   });
 
   socket.on('group_message', (msg) => {
@@ -458,6 +464,24 @@ async function getUnread() {
   });
   const data = await res.json();
   document.getElementById('out7').textContent = JSON.stringify(data, null, 2);
+}
+
+async function recallMsg() {
+  if (!token) { alert('请先登录'); return; }
+  const messageId = Number(document.getElementById('recallMsgId').value);
+  if (!messageId) { alert('请输入消息ID'); return; }
+  const res = await fetch(API + '/message/recall', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ messageId }),
+  });
+  const data = await res.json();
+  document.getElementById('out7').textContent = JSON.stringify(data, null, 2);
+  // 通过 WebSocket 通知对方
+  if (data.code === 200 && socket) {
+    socket.emit('message_recall', { messageId, receiverId: data.data.receiverId });
+    appendChat(`[系统] 已撤回消息 ID:${messageId}`);
+  }
 }
 
 // 8. 群聊

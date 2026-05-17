@@ -23,7 +23,7 @@ router.get('/history', auth, async (req, res) => {
     const offset = (page - 1) * size;
 
     const [rows] = await pool.query(
-      `SELECT id, sender_id, receiver_id, content, type, is_read, created_at
+      `SELECT id, sender_id, receiver_id, content, type, is_read, is_recalled, created_at
        FROM messages
        WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
        ORDER BY created_at DESC
@@ -51,6 +51,39 @@ router.get('/unread', auth, async (req, res) => {
     res.json({ code: 200, data: rows });
   } catch (err) {
     console.error('获取未读消息失败:', err.message);
+    res.status(500).json({ code: 500, msg: '服务器错误' });
+  }
+});
+
+// POST /message/recall - 撤回消息（仅发送者可撤回，2分钟内）
+router.post('/recall', auth, async (req, res) => {
+  try {
+    const { messageId } = req.body;
+    const userId = req.user.id;
+
+    // 查询消息
+    const [rows] = await pool.query(
+      'SELECT * FROM messages WHERE id = ? AND sender_id = ?',
+      [messageId, userId]
+    );
+    if (rows.length === 0) {
+      return res.status(400).json({ code: 400, msg: '消息不存在或无权撤回' });
+    }
+
+    const message = rows[0];
+
+    // 检查是否超过2分钟
+    const created = new Date(message.created_at).getTime();
+    if (Date.now() - created > 2 * 60 * 1000) {
+      return res.status(400).json({ code: 400, msg: '超过2分钟无法撤回' });
+    }
+
+    // 标记为已撤回
+    await pool.query('UPDATE messages SET is_recalled = 1 WHERE id = ?', [messageId]);
+
+    res.json({ code: 200, msg: '撤回成功', data: { receiverId: message.receiver_id } });
+  } catch (err) {
+    console.error('撤回消息失败:', err.message);
     res.status(500).json({ code: 500, msg: '服务器错误' });
   }
 });
