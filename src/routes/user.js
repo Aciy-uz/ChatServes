@@ -128,4 +128,51 @@ router.get('/search', auth, async (req, res) => {
   }
 });
 
+// GET /user/profile - 获取当前用户资料
+router.get('/profile', auth, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, username, nickname, avatar, created_at, last_online FROM users WHERE id = ?',
+      [req.user.id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ code: 404, msg: '用户不存在' });
+    }
+    const user = rows[0];
+    user.avatarUrl = 'http://localhost:3000' + user.avatar;
+    res.json({ code: 200, data: user });
+  } catch (err) {
+    console.error('获取用户资料失败:', err.message);
+    res.status(500).json({ code: 500, msg: '服务器错误' });
+  }
+});
+
+// PUT /user/profile - 修改昵称
+router.put('/profile', auth, async (req, res) => {
+  try {
+    const { nickname } = req.body;
+    if (!nickname) return res.status(400).json({ code: 400, msg: '请输入昵称' });
+
+    await pool.query('UPDATE users SET nickname = ? WHERE id = ?', [nickname, req.user.id]);
+    res.json({ code: 200, msg: '修改成功' });
+  } catch (err) {
+    console.error('修改昵称失败:', err.message);
+    res.status(500).json({ code: 500, msg: '服务器错误' });
+  }
+});
+
+// POST /user/avatar - 修改头像
+router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ code: 400, msg: '请上传头像图片' });
+
+    const avatar = '/uploads/' + req.file.filename;
+    await pool.query('UPDATE users SET avatar = ? WHERE id = ?', [avatar, req.user.id]);
+    res.json({ code: 200, msg: '头像修改成功', data: { avatarUrl: 'http://localhost:3000' + avatar } });
+  } catch (err) {
+    console.error('修改头像失败:', err.message);
+    res.status(500).json({ code: 500, msg: '服务器错误' });
+  }
+});
+
 module.exports = router;

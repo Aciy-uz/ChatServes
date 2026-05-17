@@ -72,6 +72,16 @@
 <pre id="out6_5"></pre>
 <hr>
 
+<!-- 修改资料 -->
+<h3>6.6 修改资料</h3>
+<button onclick="getProfile()">获取我的资料</button><br><br>
+<input id="newNickname" placeholder="新昵称"><br><br>
+<button onclick="updateNickname()">修改昵称</button><br><br>
+新头像: <input type="file" id="newAvatar" accept="image/*"><br><br>
+<button onclick="updateAvatar()">修改头像</button>
+<pre id="out6_6"></pre>
+<hr>
+
 <!-- 私聊测试 -->
 <h3>7. 私聊（WebSocket）</h3>
 <div id="wsStatus" style="padding:5px;margin:5px 0;background:#eee;">未连接</div>
@@ -280,6 +290,41 @@ async function searchUser() {
     headers: { 'Authorization': 'Bearer ' + token },
   });
   document.getElementById('out6_5').textContent = JSON.stringify(await res.json(), null, 2);
+}
+
+// 6.6 修改资料
+async function getProfile() {
+  if (!token) { document.getElementById('out6_6').textContent = '请先登录'; return; }
+  const res = await fetch(API + '/user/profile', {
+    headers: { 'Authorization': 'Bearer ' + token },
+  });
+  document.getElementById('out6_6').textContent = JSON.stringify(await res.json(), null, 2);
+}
+
+async function updateNickname() {
+  if (!token) { document.getElementById('out6_6').textContent = '请先登录'; return; }
+  const nickname = document.getElementById('newNickname').value;
+  if (!nickname) { alert('请输入新昵称'); return; }
+  const res = await fetch(API + '/user/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ nickname }),
+  });
+  document.getElementById('out6_6').textContent = JSON.stringify(await res.json(), null, 2);
+}
+
+async function updateAvatar() {
+  if (!token) { document.getElementById('out6_6').textContent = '请先登录'; return; }
+  const file = document.getElementById('newAvatar').files[0];
+  if (!file) { alert('请选择头像图片'); return; }
+  const form = new FormData();
+  form.append('avatar', file);
+  const res = await fetch(API + '/user/avatar', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token },
+    body: form,
+  });
+  document.getElementById('out6_6').textContent = JSON.stringify(await res.json(), null, 2);
 }
 
 // 7. WebSocket 私聊
