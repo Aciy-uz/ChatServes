@@ -118,7 +118,9 @@
 <button onclick="transferOwner()">转让群主（填入新群主ID）</button>
 <button onclick="disbandGroup()">解散群</button><br><br>
 <input id="groupMsgContent" placeholder="群消息内容" style="width:300px;">
-<button onclick="sendGroupMsg()">发送群消息</button>
+<button onclick="sendGroupMsg()">发送群消息</button><br><br>
+<input id="groupRecallMsgId" placeholder="撤回的群消息ID"><br><br>
+<button onclick="recallGroupMsg()">撤回群消息</button>
 <pre id="out8"></pre>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -438,10 +440,26 @@ function connectWs() {
   });
 
   socket.on('group_message', (msg) => {
-    if (Number(msg.senderId) === Number(myUserId)) {
-      appendChat(`[群${msg.groupId}][我] ${msg.content}`, 'sent');
+    const isMine = Number(msg.senderId) === Number(myUserId);
+    const prefix = `[群${msg.groupId}][ID:${msg.id}] ${isMine ? '[我]' : '[用户' + msg.senderId + ']'}`;
+
+    if (msg.type === 'image') {
+      appendChatHtml(`${prefix} <img src="${msg.content}" style="max-width:200px;max-height:200px;cursor:pointer;" onclick="window.open(this.src)">`, isMine ? 'sent' : 'received', msg.id);
+    } else if (msg.type === 'file') {
+      appendChatHtml(`${prefix} <a href="${msg.content}" target="_blank">[文件] ${msg.content.split('/').pop()}</a>`, isMine ? 'sent' : 'received', msg.id);
     } else {
-      appendChat(`[群${msg.groupId}][用户${msg.senderId}] ${msg.content}`, 'received');
+      appendChat(`${prefix} ${msg.content}`, isMine ? 'sent' : 'received', msg.id);
+    }
+  });
+
+  socket.on('group_message_recall', ({ messageId, senderId, groupId }) => {
+    const el = document.querySelector(`[data-msg-id="${messageId}"]`);
+    if (el) {
+      el.innerHTML = `[${new Date().toLocaleTimeString()}] [群${groupId}][ID:${messageId}] 用户${senderId} 撤回了一条消息`;
+      el.style.color = '#999';
+      el.style.fontStyle = 'italic';
+    } else {
+      appendChat(`[系统] 群${groupId} 中用户${senderId} 撤回了一条消息 (ID:${messageId})`);
     }
   });
 
@@ -613,6 +631,28 @@ function sendGroupMsg() {
   if (!groupId || !content) { alert('请输入群ID和消息内容'); return; }
   socket.emit('group_message', { groupId, content, type: 'text' });
   document.getElementById('groupMsgContent').value = '';
+}
+
+async function recallGroupMsg() {
+  if (!token) { alert('请先登录'); return; }
+  const messageId = Number(document.getElementById('groupRecallMsgId').value);
+  if (!messageId) { alert('请输入消息ID'); return; }
+  const res = await fetch(API + '/group/recall', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ messageId }),
+  });
+  const data = await res.json();
+  document.getElementById('out8').textContent = JSON.stringify(data, null, 2);
+  if (data.code === 200 && socket) {
+    socket.emit('group_message_recall', { messageId, groupId: data.data.groupId });
+    const el = document.querySelector(`[data-msg-id="${messageId}"]`);
+    if (el) {
+      el.innerHTML = `[${new Date().toLocaleTimeString()}] [群${data.data.groupId}][ID:${messageId}] 你撤回了一条消息`;
+      el.style.color = '#999';
+      el.style.fontStyle = 'italic';
+    }
+  }
 }
 
 async function kickMember() {

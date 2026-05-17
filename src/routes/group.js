@@ -247,7 +247,7 @@ router.get('/history', auth, async (req, res) => {
     const offset = (page - 1) * size;
 
     const [rows] = await pool.query(
-      `SELECT gm.id, gm.sender_id, gm.content, gm.type, gm.created_at,
+      `SELECT gm.id, gm.sender_id, gm.content, gm.type, gm.is_recalled, gm.created_at,
               u.username, u.nickname, u.avatar
        FROM group_messages gm
        JOIN users u ON gm.sender_id = u.id
@@ -260,6 +260,39 @@ router.get('/history', auth, async (req, res) => {
     res.json({ code: 200, data: rows.reverse() });
   } catch (err) {
     console.error('获取群聊天记录失败:', err.message);
+    res.status(500).json({ code: 500, msg: '服务器错误' });
+  }
+});
+
+// POST /group/recall - 撤回群消息（仅发送者，2分钟内）
+router.post('/recall', auth, async (req, res) => {
+  try {
+    const { messageId } = req.body;
+    const userId = req.user.id;
+
+    // 查询消息
+    const [rows] = await pool.query(
+      'SELECT * FROM group_messages WHERE id = ? AND sender_id = ?',
+      [messageId, userId]
+    );
+    if (rows.length === 0) {
+      return res.status(400).json({ code: 400, msg: '消息不存在或无权撤回' });
+    }
+
+    const message = rows[0];
+
+    // 检查是否超过2分钟
+    const created = new Date(message.created_at).getTime();
+    if (Date.now() - created > 2 * 60 * 1000) {
+      return res.status(400).json({ code: 400, msg: '超过2分钟无法撤回' });
+    }
+
+    // 标记为已撤回
+    await pool.query('UPDATE group_messages SET is_recalled = 1 WHERE id = ?', [messageId]);
+
+    res.json({ code: 200, msg: '撤回成功', data: { groupId: message.group_id } });
+  } catch (err) {
+    console.error('撤回群消息失败:', err.message);
     res.status(500).json({ code: 500, msg: '服务器错误' });
   }
 });

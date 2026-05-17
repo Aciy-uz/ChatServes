@@ -133,16 +133,24 @@ function initSocket(server) {
       }
     });
 
-    // 消息撤回通知
+    // 私聊消息撤回通知
     socket.on('message_recall', async ({ messageId, receiverId }) => {
       try {
-        // 通知接收者消息已撤回
         const receiverSocketId = onlineUsers.get(receiverId);
         if (receiverSocketId) {
           io.to(receiverSocketId).emit('message_recall', { messageId, senderId: userId });
         }
       } catch (err) {
         console.error('撤回通知失败:', err.message);
+      }
+    });
+
+    // 群消息撤回通知
+    socket.on('group_message_recall', async ({ messageId, groupId }) => {
+      try {
+        io.to(`group_${groupId}`).emit('group_message_recall', { messageId, senderId: userId, groupId });
+      } catch (err) {
+        console.error('群消息撤回通知失败:', err.message);
       }
     });
 
