@@ -7,6 +7,7 @@ const rsaRouter = require('./routes/rsa');
 const userRouter = require('./routes/user');
 const friendRouter = require('./routes/friend');
 const messageRouter = require('./routes/message');
+const groupRouter = require('./routes/group');
 const { initSocket } = require('./socket');
 
 const app = express();
@@ -65,6 +66,18 @@ app.use('/friend', friendRouter);
 // /message/history - 获取聊天记录
 // /message/unread  - 获取未读消息统计
 app.use('/message', messageRouter);
+
+// =============================================
+// 群聊相关路由（需要 token）
+// =============================================
+
+// /group/create  - 创建群
+// /group/list    - 获取我的群列表
+// /group/members - 获取群成员
+// /group/join    - 加入群
+// /group/quit    - 退出群
+// /group/history - 群聊天记录
+app.use('/group', groupRouter);
 
 // =============================================
 // 启动服务（HTTP + WebSocket）

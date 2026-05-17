@@ -32,6 +32,19 @@ function initSocket(server) {
     // 注册在线状态
     onlineUsers.set(userId, socket.id);
 
+    // 自动加入所有群的房间
+    try {
+      const [groups] = await pool.query(
+        'SELECT group_id FROM group_members WHERE user_id = ?',
+        [userId]
+      );
+      for (const g of groups) {
+        socket.join(`group_${g.group_id}`);
+      }
+    } catch (err) {
+      console.error('加入群房间失败:', err.message);
+    }
+
     // 广播上线通知
     socket.broadcast.emit('user_online', { userId });
 
@@ -117,6 +130,41 @@ function initSocket(server) {
         }
       } catch (err) {
         console.error('标记已读失败:', err.message);
+      }
+    });
+
+    // 群聊消息
+    socket.on('group_message', async ({ groupId, content, type = 'text' }) => {
+      try {
+        // 检查用户是否在群中
+        const [member] = await pool.query(
+          'SELECT * FROM group_members WHERE group_id = ? AND user_id = ?',
+          [groupId, userId]
+        );
+        if (member.length === 0) {
+          return socket.emit('error_message', { msg: '你不在该群中' });
+        }
+
+        // 存入数据库
+        const [result] = await pool.query(
+          'INSERT INTO group_messages (group_id, sender_id, content, type) VALUES (?, ?, ?, ?)',
+          [groupId, userId, content, type]
+        );
+
+        const message = {
+          id: result.insertId,
+          groupId,
+          senderId: userId,
+          content,
+          type,
+          createdAt: new Date(),
+        };
+
+        // 广播给群内所有成员（包括发送者）
+        io.to(`group_${groupId}`).emit('group_message', message);
+      } catch (err) {
+        console.error('发送群消息失败:', err.message);
+        socket.emit('error_message', { msg: '群消息发送失败' });
       }
     });
 

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { decrypt } = require('../utils/rsa');
-const { sign } = require('../utils/jwt');
+const { sign, verify } = require('../utils/jwt');
 const { createCaptcha } = require('../utils/captcha');
 const upload = require('../utils/upload');
 
@@ -92,6 +92,38 @@ router.post('/register', upload.single('avatar'), async (req, res) => {
     res.json({ code: 200, msg: '注册成功', data: { id: result.insertId } });
   } catch (err) {
     console.error('注册失败:', err.message);
+    res.status(500).json({ code: 500, msg: '服务器错误' });
+  }
+});
+
+// 验证 token 的中间件
+function auth(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ code: 401, msg: '未登录' });
+  try {
+    req.user = verify(token);
+    next();
+  } catch {
+    res.status(401).json({ code: 401, msg: 'token 无效或已过期' });
+  }
+}
+
+// GET /user/search - 搜索用户（按用户名或昵称模糊匹配）
+router.get('/search', auth, async (req, res) => {
+  try {
+    const { keyword } = req.query;
+    if (!keyword) return res.status(400).json({ code: 400, msg: '请输入搜索关键字' });
+
+    const [rows] = await pool.query(
+      `SELECT id, username, nickname, avatar
+       FROM users
+       WHERE id != ? AND (username LIKE ? OR nickname LIKE ?)
+       LIMIT 20`,
+      [req.user.id, `%${keyword}%`, `%${keyword}%`]
+    );
+    res.json({ code: 200, data: rows });
+  } catch (err) {
+    console.error('搜索用户失败:', err.message);
     res.status(500).json({ code: 500, msg: '服务器错误' });
   }
 });
