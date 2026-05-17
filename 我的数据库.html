@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graduation Chat - 数据库设计文档</title>
+<style>
+  :root {
+    --primary: #07c160;
+    --primary-dark: #06ad56;
+    --bg: #f5f5f5;
+    --card: #ffffff;
+    --text: #333333;
+    --text-light: #888888;
+    --border: #e5e5e5;
+    --code-bg: #f8f8f8;
+    --accent-blue: #576b95;
+    --accent-orange: #fa9d3b;
+    --accent-red: #fa5151;
+    --accent-purple: #6467ef;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #07c160 0%, #06ad56 50%, #049a4a 100%);
+    color: white;
+    padding: 48px 24px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+    animation: pulse 6s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+  .header h1 {
+    font-size: 2.2em;
+    font-weight: 700;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .header p {
+    font-size: 1.1em;
+    opacity: 0.9;
+    position: relative;
+  }
+  .header .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    margin-top: 12px;
+    position: relative;
+  }
+
+  /* Container */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 40px;
+  }
+  .section-title {
+    font-size: 1.5em;
+    font-weight: 700;
+    margin-bottom: 20px;
+    padding-left: 14px;
+    border-left: 4px solid var(--primary);
+    line-height: 1.3;
+  }
+
+  /* Overview Cards */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .overview-card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: transform 0.2s;
+  }
+  .overview-card:hover { transform: translateY(-2px); }
+  .overview-card .icon { font-size: 2em; margin-bottom: 8px; }
+  .overview-card .num {
+    font-size: 2em;
+    font-weight: 700;
+    color: var(--primary);
+  }
+  .overview-card .label {
+    font-size: 0.9em;
+    color: var(--text-light);
+    margin-top: 4px;
+  }
+
+  /* ER Diagram */
+  .er-diagram {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    overflow-x: auto;
+  }
+  .er-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    min-width: 800px;
+  }
+  .er-row {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    flex-wrap: nowrap;
+  }
+  .er-table {
+    background: #fff;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    min-width: 170px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .er-table-header {
+    padding: 10px 16px;
+    font-weight: 700;
+    font-size: 0.95em;
+    text-align: center;
+    color: white;
+  }
+  .er-table-header.green { background: var(--primary); }
+  .er-table-header.blue { background: var(--accent-blue); }
+  .er-table-header.orange { background: var(--accent-orange); }
+  .er-table-header.purple { background: var(--accent-purple); }
+  .er-table-header.red { background: var(--accent-red); }
+  .er-fields {
+    padding: 8px 0;
+    font-size: 0.82em;
+  }
+  .er-field {
+    padding: 3px 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .er-field .pk {
+    background: var(--accent-orange);
+    color: white;
+    font-size: 0.7em;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .er-field .fk {
+    background: var(--accent-blue);
+    color: white;
+    font-size: 0.7em;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+
+  /* Relation arrows */
+  .er-relations {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 8px 0;
+    font-size: 0.8em;
+    color: var(--text-light);
+  }
+  .er-rel {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .er-rel .arrow { color: var(--primary); font-size: 1.2em; }
+
+  /* Table Card */
+  .table-card {
+    background: var(--card);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    margin-bottom: 24px;
+  }
+  .table-card-header {
+    padding: 20px 28px;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .table-card-header.green { background: linear-gradient(135deg, #07c160, #06ad56); }
+  .table-card-header.blue { background: linear-gradient(135deg, #576b95, #4a5f85); }
+  .table-card-header.orange { background: linear-gradient(135deg, #fa9d3b, #e89030); }
+  .table-card-header.purple { background: linear-gradient(135deg, #6467ef, #5558d9); }
+  .table-card-header.red { background: linear-gradient(135deg, #fa5151, #e04848); }
+  .table-card-header h3 { font-size: 1.2em; }
+  .table-card-header .desc {
+    font-size: 0.9em;
+    opacity: 0.85;
+    margin-left: auto;
+  }
+
+  .table-card-body { padding: 0; }
+
+  .field-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .field-table th {
+    background: #fafafa;
+    padding: 12px 20px;
+    text-align: left;
+    font-size: 0.85em;
+    color: var(--text-light);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .field-table td {
+    padding: 14px 20px;
+    border-bottom: 1px solid #f2f2f2;
+    font-size: 0.95em;
+  }
+  .field-table tr:last-child td { border-bottom: none; }
+  .field-table tr:hover { background: #fafafa; }
+
+  .field-name {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-weight: 600;
+    color: var(--accent-blue);
+  }
+  .field-type {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.88em;
+    color: var(--text-light);
+    background: var(--code-bg);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-weight: 600;
+  }
+  .tag-pk { background: #fff3e0; color: #e65100; }
+  .tag-fk { background: #e3f2fd; color: #1565c0; }
+  .tag-uniq { background: #f3e5f5; color: #7b1fa2; }
+  .tag-nn { background: #fce4ec; color: #c62828; }
+  .tag-auto { background: #e8f5e9; color: #2e7d32; }
+
+  .default-val {
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 0.88em;
+    color: var(--text-light);
+  }
+
+  /* Relations Section */
+  .relations-list {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .rel-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid #f2f2f2;
+    font-size: 0.95em;
+  }
+  .rel-item:last-child { border-bottom: none; }
+  .rel-badge {
+    background: #e8f5e9;
+    color: var(--primary);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.82em;
+    white-space: nowrap;
+  }
+  .rel-arrow { color: var(--primary); font-size: 1.4em; }
+  .rel-code {
+    font-family: "SFMono-Regular", Consolas, monospace;
+    background: var(--code-bg);
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+
+  /* SQL Section */
+  .sql-card {
+    background: var(--card);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    margin-bottom: 20px;
+  }
+  .sql-card-header {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 12px 20px;
+    font-size: 0.9em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .sql-card-header .dot {
+    width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+  }
+  .sql-card-header .dots { display: flex; gap: 6px; }
+  .sql-card-header .dot.red { background: #ff5f56; }
+  .sql-card-header .dot.yellow { background: #ffbd2e; }
+  .sql-card-header .dot.green { background: #27c93f; }
+  .sql-block {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 20px 24px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.88em;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .sql-block .kw { color: #569cd6; }
+  .sql-block .fn { color: #dcdcaa; }
+  .sql-block .str { color: #ce9178; }
+  .sql-block .num { color: #b5cea8; }
+  .sql-block .cmt { color: #6a9955; }
+  .sql-block .tbl { color: #4ec9b0; }
+  .sql-block .col { color: #9cdcfe; }
+
+  /* Notes */
+  .note-box {
+    background: #fffbe6;
+    border-left: 4px solid #faad14;
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 0.92em;
+    color: #8a6d00;
+  }
+  .note-box strong { color: #614e00; }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 32px 20px;
+    color: var(--text-light);
+    font-size: 0.85em;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+  }
+
+  /* Copy button */
+  .copy-btn {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #d4d4d4;
+    padding: 4px 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.82em;
+    transition: all 0.2s;
+  }
+  .copy-btn:hover { background: rgba(255,255,255,0.25); }
+
+  @media (max-width: 768px) {
+    .header h1 { font-size: 1.6em; }
+    .overview-grid { grid-template-columns: repeat(2, 1fr); }
+    .field-table th, .field-table td { padding: 10px 12px; }
+    .er-diagram { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>Graduation Chat</h1>
+  <p>类微信聊天软件 - 数据库设计文档</p>
+  <div class="badge">MySQL 8.0 | Database: graduation</div>
+</div>
+
+<div class="container">
+
+  <!-- Overview -->
+  <div class="section">
+    <h2 class="section-title">概览</h2>
+    <div class="overview-grid">
+      <div class="overview-card">
+        <div class="icon">&#128450;</div>
+        <div class="num">5</div>
+        <div class="label">数据表</div>
+      </div>
+      <div class="overview-card">
+        <div class="icon">&#128279;</div>
+        <div class="num">4</div>
+        <div class="label">外键关联</div>
+      </div>
+      <div class="overview-card">
+        <div class="icon">&#128100;</div>
+        <div class="num">users</div>
+        <div class="label">核心用户表</div>
+      </div>
+      <div class="overview-card">
+        <div class="icon">&#128172;</div>
+        <div class="num">messages</div>
+        <div class="label">消息核心表</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ER Diagram -->
+  <div class="section">
+    <h2 class="section-title">E-R 关系图</h2>
+    <div class="er-diagram">
+      <div class="er-container">
+        <!-- Top row: users -->
+        <div class="er-row">
+          <div class="er-table">
+            <div class="er-table-header green">users (用户表)</div>
+            <div class="er-fields">
+              <div class="er-field"><span class="pk">PK</span> id</div>
+              <div class="er-field">username</div>
+              <div class="er-field">password</div>
+              <div class="er-field">nickname</div>
+              <div class="er-field">avatar</div>
+              <div class="er-field">created_at</div>
+              <div class="er-field">last_online</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle row: friends, user_groups -->
+        <div class="er-row">
+          <div class="er-table">
+            <div class="er-table-header blue">friends (好友关系表)</div>
+            <div class="er-fields">
+              <div class="er-field"><span class="pk">PK</span> id</div>
+              <div class="er-field"><span class="fk">FK</span> user_id &rarr; users.id</div>
+              <div class="er-field"><span class="fk">FK</span> friend_id &rarr; users.id</div>
+              <div class="er-field">created_at</div>
+            </div>
+          </div>
+          <div class="er-table">
+            <div class="er-table-header orange">user_groups (群组表)</div>
+            <div class="er-fields">
+              <div class="er-field"><span class="pk">PK</span> id</div>
+              <div class="er-field">name</div>
+              <div class="er-field">owner_id</div>
+              <div class="er-field">created_at</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom row: messages, group_members -->
+        <div class="er-row">
+          <div class="er-table">
+            <div class="er-table-header red">messages (消息表)</div>
+            <div class="er-fields">
+              <div class="er-field"><span class="pk">PK</span> id</div>
+              <div class="er-field"><span class="fk">FK</span> sender_id &rarr; users.id</div>
+              <div class="er-field"><span class="fk">FK</span> receiver_id &rarr; users.id</div>
+              <div class="er-field">content</div>
+              <div class="er-field">is_read</div>
+              <div class="er-field">created_at</div>
+            </div>
+          </div>
+          <div class="er-table">
+            <div class="er-table-header purple">group_members (群成员表)</div>
+            <div class="er-fields">
+              <div class="er-field"><span class="pk">PK</span> group_id</div>
+              <div class="er-field"><span class="pk">PK</span> user_id</div>
+              <div class="er-field">joined_at</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table: users -->
+  <div class="section">
+    <h2 class="section-title">表结构详情</h2>
+
+    <div class="table-card">
+      <div class="table-card-header green">
+        <h3>users</h3>
+        <span class="desc">用户表 - 存储所有注册用户的基本信息</span>
+      </div>
+      <div class="table-card-body">
+        <table class="field-table">
+          <thead>
+            <tr>
+              <th>字段名</th>
+              <th>类型</th>
+              <th>约束</th>
+              <th>默认值</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="field-name">id</td>
+              <td class="field-type">INT</td>
+              <td><span class="tag tag-pk">PK</span> <span class="tag tag-auto">AUTO_INCREMENT</span></td>
+              <td class="default-val">-</td>
+              <td>用户唯一标识，自增主键</td>
+            </tr>
+            <tr>
+              <td class="field-name">username</td>
+              <td class="field-type">VARCHAR(50)</td>
+              <td><span class="tag tag-nn">NOT NULL</span> <span class="tag tag-uniq">UNIQUE</span></td>
+              <td class="default-val">-</td>
+              <td>登录用户名，不可重复</td>
+            </tr>
+            <tr>
+              <td class="field-name">password</td>
+              <td class="field-type">VARCHAR(255)</td>
+              <td><span class="tag tag-nn">NOT NULL</span></td>
+              <td class="default-val">-</td>
+              <td>登录密码（建议 BCrypt 加密存储）</td>
+            </tr>
+            <tr>
+              <td class="field-name">nickname</td>
+              <td class="field-type">VARCHAR(50)</td>
+              <td>-</td>
+              <td class="default-val">NULL</td>
+              <td>用户昵称/显示名称，可修改</td>
+            </tr>
+            <tr>
+              <td class="field-name">avatar</td>
+              <td class="field-type">VARCHAR(255)</td>
+              <td>-</td>
+              <td class="default-val">/default-avatar.png</td>
+              <td>头像文件路径或 URL</td>
+            </tr>
+            <tr>
+              <td class="field-name">created_at</td>
+              <td class="field-type">TIMESTAMP</td>
+              <td>-</td>
+              <td class="default-val">CURRENT_TIMESTAMP</td>
+              <td>账号注册时间，自动填充</td>
+            </tr>
+            <tr>
+              <td class="field-name">last_online</td>
+              <td class="field-type">TIMESTAMP</td>
+              <td>-</td>
+              <td class="default-val">NULL</td>
+              <td>最后在线时间，用于显示在线状态</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Table: friends -->
+    <div class="table-card">
+      <div class="table-card-header blue">
+        <h3>friends</h3>
+        <span class="desc">好友关系表 - 存储用户之间的好友关系</span>
+      </div>
+      <div class="table-card-body">
+        <table class="field-table">
+          <thead>
+            <tr>
+              <th>字段名</th>
+              <th>类型</th>
+              <th>约束</th>
+              <th>默认值</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="field-name">id</td>
+              <td class="field-type">INT</td>
+              <td><span class="tag tag-pk">PK</span> <span class="tag tag-auto">AUTO_INCREMENT</span></td>
+              <td class="default-val">-</td>
+              <td>关系记录唯一标识</td>
+            </tr>
+            <tr>
+              <td class="field-name">user_id</td>
+              <td class="field-type">INT</td>
+              <td><span class="tag tag-fk">FK</span> <span class="tag tag-nn">NOT NULL</span></td>
+              <td class="default-val">-</td>
+              <td>发起方用户 ID，关联 users.id</td>
+            </tr>
+            <tr>
+              <td class="field-name">friend_id</td>
+              <td class="field-type">INT</td>
+              <td><span class="tag tag-fk">FK</span> <span class="tag tag-nn">NOT NULL</span></td>
+              <td class="default-val">-</td>
+              <td>目标方用户 ID，关联 users.id</td>
+            </tr>
+            <tr>
+              <td class="field-name">created_at</td>
+              <td class="field-type">TIMESTAMP</td>
+              <td>-</td>
+              <td class="default-val">CURRENT_TIMESTAMP</td>
+              <td>好友关系建立时间</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="note-box">
+      <strong>注意：</strong>当前好友关系是单向记录。如果 A 添加 B 为好友，只插入一条 (A, B) 记录。查询双方共同好友时需要同时匹配 user_id 和 friend_id 两个方向。如需双向关系，可考虑添加触发器自动插入 (B, A) 记录。
+    </div>
+
+    <!-- Table: messages -->
+    <div class="table-card">
+      <div class="table-card-header red">
+        <h3>messages</h3>
+        <span class="desc">消息表 - 存储所有私聊消息记录</span>
+      </div>
+      <div class="table-card-body">
+        <table class="field-table">
+          <thead>
+            <tr>
+              <th>字段名</th>
+              <th>类型</th>
+              <th>约束</th>
+              <th>默认值</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="field-name">id</td>
+              <td class="field-type">INT</td>
+              <td><span class="tag tag-pk">PK</span> <span class="tag tag-auto">AUTO_INCREMENT</span></td>
+              <td class="default-val">-</td>
+              <td>消息唯一标识</td>
+            </tr>
+            <tr>
+              <td class="field-name">sender_id</td>
+              <td class="field-type">INT</td>
+              <td><span class="tag tag-fk">FK</span> <span class="tag tag-nn">NOT NULL</span></td>
+              <td class="default-val">-</td>
+              <td>发送者用户 ID，关联 users.id</td>
+            </tr>
+            <tr>
+              <td class="field-name">receiver_id</td>
+              <td class="field-type">INT</td>
+              <td><span class="tag tag-fk">FK</span> <span class="tag tag-nn">NOT NULL</span></td>
+              <td class="default-val">-</td>
+              <td>接收者用户 ID，关联 users.id</td>
+            </tr>
+            <tr>
+              <td class="field-name">content</td>
+              <td class="field-type">TEXT</td>
+              <td><span class="tag tag-nn">NOT NULL</span></td>
+              <td class="default-val">-</td>
+              <td>消息内容（文本/图片URL/文件路径等）</td>
+            </tr>
+            <tr>
+              <td class="field-name">is_read</td>
+              <td class="field-type">TINYINT(1)</td>
+              <td>-</td>
+              <td class="default-val">0</td>
+              <td>是否已读：0=未读, 1=已读</td>
+            </tr>
+            <tr>
+              <td class="field-name">created_at</td>
+              <td class="field-type">TIMESTAMP</td>
+              <td>-</td>
+              <td class="default-val">CURRENT_TIMESTAMP</td>
+              <td>消息发送时间</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="note-box">
+      <strong>扩展建议：</strong>当前 content 为 TEXT 类型，仅支持纯文本。如需支持图片、语音、文件等多媒体消息，建议增加 <code>msg_type</code> 字段（如 text/image/file/voice），content 统一存 JSON 或对应资源路径。
+    </div>
+
+    <!-- Table: user_groups -->
+    <div class="table-card">
+      <div class="table-card-header orange">
+        <h3>user_groups</h3>
+        <span class="desc">群组表 - 存储聊天群的基本信息</span>
+      </div>
+      <div class="table-card-body">
+        <table class="field-table">
+          <thead>
+            <tr>
+              <th>字段名</th>
+              <th>类型</th>
+              <th>约束</th>
+              <th>默认值</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="field-name">id</td>
+              <td class="field-type">INT</td>
+              <td><span class="tag tag-pk">PK</span> <span class="tag tag-auto">AUTO_INCREMENT</span></td>
+              <td class="default-val">-</td>
+              <td>群组唯一标识</td>
+            </tr>
+            <tr>
+              <td class="field-name">name</td>
+              <td class="field-type">VARCHAR(100)</td>
+              <td><span class="tag tag-nn">NOT NULL</span></td>
+              <td class="default-val">-</td>
+              <td>群名称</td>
+            </tr>
+            <tr>
+              <td class="field-name">owner_id</td>
+              <td class="field-type">INT</td>
+              <td><span class="tag tag-nn">NOT NULL</span></td>
+              <td class="default-val">-</td>
+              <td>群主用户 ID（未建立外键，建议添加）</td>
+            </tr>
+            <tr>
+              <td class="field-name">created_at</td>
+              <td class="field-type">TIMESTAMP</td>
+              <td>-</td>
+              <td class="default-val">CURRENT_TIMESTAMP</td>
+              <td>群组创建时间</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Table: group_members -->
+    <div class="table-card">
+      <div class="table-card-header purple">
+        <h3>group_members</h3>
+        <span class="desc">群成员表 - 存储群组与成员的多对多关系</span>
+      </div>
+      <div class="table-card-body">
+        <table class="field-table">
+          <thead>
+            <tr>
+              <th>字段名</th>
+              <th>类型</th>
+              <th>约束</th>
+              <th>默认值</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="field-name">group_id</td>
+              <td class="field-type">INT</td>
+              <td><span class="tag tag-pk">PK</span> <span class="tag tag-nn">NOT NULL</span></td>
+              <td class="default-val">-</td>
+              <td>群组 ID（联合主键之一）</td>
+            </tr>
+            <tr>
+              <td class="field-name">user_id</td>
+              <td class="field-type">INT</td>
+              <td><span class="tag tag-pk">PK</span> <span class="tag tag-nn">NOT NULL</span></td>
+              <td class="default-val">-</td>
+              <td>成员用户 ID（联合主键之一）</td>
+            </tr>
+            <tr>
+              <td class="field-name">joined_at</td>
+              <td class="field-type">TIMESTAMP</td>
+              <td>-</td>
+              <td class="default-val">CURRENT_TIMESTAMP</td>
+              <td>加入群组的时间</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Relationships -->
+  <div class="section">
+    <h2 class="section-title">外键关系</h2>
+    <div class="relations-list">
+      <div class="rel-item">
+        <span class="rel-badge">1 : N</span>
+        <span class="rel-code">users.id</span>
+        <span class="rel-arrow">&larr;</span>
+        <span class="rel-code">friends.user_id</span>
+        <span>用户可以拥有多个好友关系</span>
+      </div>
+      <div class="rel-item">
+        <span class="rel-badge">1 : N</span>
+        <span class="rel-code">users.id</span>
+        <span class="rel-arrow">&larr;</span>
+        <span class="rel-code">friends.friend_id</span>
+        <span>用户可以被多个用户添加为好友</span>
+      </div>
+      <div class="rel-item">
+        <span class="rel-badge">1 : N</span>
+        <span class="rel-code">users.id</span>
+        <span class="rel-arrow">&larr;</span>
+        <span class="rel-code">messages.sender_id</span>
+        <span>用户可以发送多条消息</span>
+      </div>
+      <div class="rel-item">
+        <span class="rel-badge">1 : N</span>
+        <span class="rel-code">users.id</span>
+        <span class="rel-arrow">&larr;</span>
+        <span class="rel-code">messages.receiver_id</span>
+        <span>用户可以接收多条消息</span>
+      </div>
+      <div class="rel-item">
+        <span class="rel-badge">M : N</span>
+        <span class="rel-code">user_groups.id</span>
+        <span class="rel-arrow">&harr;</span>
+        <span class="rel-code">users.id</span>
+        <span>通过 group_members 表关联，一个群有多个成员，一个用户可加入多个群</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Common Queries -->
+  <div class="section">
+    <h2 class="section-title">常用 SQL 查询</h2>
+
+    <!-- User Registration -->
+    <div class="sql-card">
+      <div class="sql-card-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <span>用户注册</span>
+        <button class="copy-btn" onclick="copySql(this)">复制</button>
+      </div>
+      <div class="sql-block"><span class="kw">INSERT INTO</span> <span class="tbl">users</span> (<span class="col">username</span>, <span class="col">password</span>, <span class="col">nickname</span>)
+<span class="kw">VALUES</span> (<span class="str">'zhangsan'</span>, <span class="str">'$2a$10$hashedPassword...'</span>, <span class="str">'张三'</span>);</div>
+    </div>
+
+    <!-- Login -->
+    <div class="sql-card">
+      <div class="sql-card-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <span>用户登录验证</span>
+        <button class="copy-btn" onclick="copySql(this)">复制</button>
+      </div>
+      <div class="sql-block"><span class="kw">SELECT</span> <span class="col">id</span>, <span class="col">username</span>, <span class="col">nickname</span>, <span class="col">avatar</span>
+<span class="kw">FROM</span> <span class="tbl">users</span>
+<span class="kw">WHERE</span> <span class="col">username</span> = <span class="str">'zhangsan'</span>
+  <span class="kw">AND</span> <span class="col">password</span> = <span class="str">'$2a$10$hashedPassword...'</span>;</div>
+    </div>
+
+    <!-- Add Friend -->
+    <div class="sql-card">
+      <div class="sql-card-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <span>添加好友</span>
+        <button class="copy-btn" onclick="copySql(this)">复制</button>
+      </div>
+      <div class="sql-block"><span class="cmt">-- 添加双向好友关系</span>
+<span class="kw">INSERT INTO</span> <span class="tbl">friends</span> (<span class="col">user_id</span>, <span class="col">friend_id</span>) <span class="kw">VALUES</span> (<span class="num">1</span>, <span class="num">2</span>);
+<span class="kw">INSERT INTO</span> <span class="tbl">friends</span> (<span class="col">user_id</span>, <span class="col">friend_id</span>) <span class="kw">VALUES</span> (<span class="num">2</span>, <span class="num">1</span>);</div>
+    </div>
+
+    <!-- Friend List -->
+    <div class="sql-card">
+      <div class="sql-card-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <span>查询好友列表</span>
+        <button class="copy-btn" onclick="copySql(this)">复制</button>
+      </div>
+      <div class="sql-block"><span class="kw">SELECT</span> <span class="col">u.id</span>, <span class="col">u.username</span>, <span class="col">u.nickname</span>, <span class="col">u.avatar</span>, <span class="col">u.last_online</span>
+<span class="kw">FROM</span> <span class="tbl">friends</span> <span class="col">f</span>
+<span class="kw">JOIN</span> <span class="tbl">users</span> <span class="col">u</span> <span class="kw">ON</span> <span class="col">f.friend_id</span> = <span class="col">u.id</span>
+<span class="kw">WHERE</span> <span class="col">f.user_id</span> = <span class="num">1</span>
+<span class="kw">ORDER BY</span> <span class="col">u.last_online</span> <span class="kw">DESC</span>;</div>
+    </div>
+
+    <!-- Send Message -->
+    <div class="sql-card">
+      <div class="sql-card-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <span>发送消息</span>
+        <button class="copy-btn" onclick="copySql(this)">复制</button>
+      </div>
+      <div class="sql-block"><span class="kw">INSERT INTO</span> <span class="tbl">messages</span> (<span class="col">sender_id</span>, <span class="col">receiver_id</span>, <span class="col">content</span>)
+<span class="kw">VALUES</span> (<span class="num">1</span>, <span class="num">2</span>, <span class="str">'你好，在吗？'</span>);</div>
+    </div>
+
+    <!-- Chat History -->
+    <div class="sql-card">
+      <div class="sql-card-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <span>查询与某人的聊天记录（分页）</span>
+        <button class="copy-btn" onclick="copySql(this)">复制</button>
+      </div>
+      <div class="sql-block"><span class="kw">SELECT</span> <span class="col">m.id</span>, <span class="col">m.content</span>, <span class="col">m.is_read</span>, <span class="col">m.created_at</span>,
+       <span class="col">u.nickname</span> <span class="kw">AS</span> <span class="col">sender_name</span>, <span class="col">u.avatar</span> <span class="kw">AS</span> <span class="col">sender_avatar</span>
+<span class="kw">FROM</span> <span class="tbl">messages</span> <span class="col">m</span>
+<span class="kw">JOIN</span> <span class="tbl">users</span> <span class="col">u</span> <span class="kw">ON</span> <span class="col">m.sender_id</span> = <span class="col">u.id</span>
+<span class="kw">WHERE</span> (<span class="col">m.sender_id</span> = <span class="num">1</span> <span class="kw">AND</span> <span class="col">m.receiver_id</span> = <span class="num">2</span>)
+   <span class="kw">OR</span> (<span class="col">m.sender_id</span> = <span class="num">2</span> <span class="kw">AND</span> <span class="col">m.receiver_id</span> = <span class="num">1</span>)
+<span class="kw">ORDER BY</span> <span class="col">m.created_at</span> <span class="kw">DESC</span>
+<span class="kw">LIMIT</span> <span class="num">20</span> <span class="kw">OFFSET</span> <span class="num">0</span>;</div>
+    </div>
+
+    <!-- Unread Count -->
+    <div class="sql-card">
+      <div class="sql-card-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <span>查询未读消息数（按发送者分组）</span>
+        <button class="copy-btn" onclick="copySql(this)">复制</button>
+      </div>
+      <div class="sql-block"><span class="kw">SELECT</span> <span class="col">sender_id</span>, <span class="fn">COUNT</span>(*) <span class="kw">AS</span> <span class="col">unread_count</span>
+<span class="kw">FROM</span> <span class="tbl">messages</span>
+<span class="kw">WHERE</span> <span class="col">receiver_id</span> = <span class="num">1</span> <span class="kw">AND</span> <span class="col">is_read</span> = <span class="num">0</span>
+<span class="kw">GROUP BY</span> <span class="col">sender_id</span>;</div>
+    </div>
+
+    <!-- Mark as read -->
+    <div class="sql-card">
+      <div class="sql-card-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <span>标记消息已读</span>
+        <button class="copy-btn" onclick="copySql(this)">复制</button>
+      </div>
+      <div class="sql-block"><span class="kw">UPDATE</span> <span class="tbl">messages</span>
+<span class="kw">SET</span> <span class="col">is_read</span> = <span class="num">1</span>
+<span class="kw">WHERE</span> <span class="col">sender_id</span> = <span class="num">2</span>
+  <span class="kw">AND</span> <span class="col">receiver_id</span> = <span class="num">1</span>
+  <span class="kw">AND</span> <span class="col">is_read</span> = <span class="num">0</span>;</div>
+    </div>
+
+    <!-- Create Group -->
+    <div class="sql-card">
+      <div class="sql-card-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <span>创建群组并添加成员</span>
+        <button class="copy-btn" onclick="copySql(this)">复制</button>
+      </div>
+      <div class="sql-block"><span class="cmt">-- 1. 创建群</span>
+<span class="kw">INSERT INTO</span> <span class="tbl">user_groups</span> (<span class="col">name</span>, <span class="col">owner_id</span>) <span class="kw">VALUES</span> (<span class="str">'开发小组'</span>, <span class="num">1</span>);
+<span class="kw">SET</span> @group_id = <span class="fn">LAST_INSERT_ID</span>();
+
+<span class="cmt">-- 2. 添加群成员</span>
+<span class="kw">INSERT INTO</span> <span class="tbl">group_members</span> (<span class="col">group_id</span>, <span class="col">user_id</span>)
+<span class="kw">VALUES</span>
+  (@group_id, <span class="num">1</span>),
+  (@group_id, <span class="num">2</span>),
+  (@group_id, <span class="num">3</span>);</div>
+    </div>
+
+    <!-- Group Members -->
+    <div class="sql-card">
+      <div class="sql-card-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <span>查询群成员列表</span>
+        <button class="copy-btn" onclick="copySql(this)">复制</button>
+      </div>
+      <div class="sql-block"><span class="kw">SELECT</span> <span class="col">u.id</span>, <span class="col">u.username</span>, <span class="col">u.nickname</span>, <span class="col">u.avatar</span>, <span class="col">gm.joined_at</span>
+<span class="kw">FROM</span> <span class="tbl">group_members</span> <span class="col">gm</span>
+<span class="kw">JOIN</span> <span class="tbl">users</span> <span class="col">u</span> <span class="kw">ON</span> <span class="col">gm.user_id</span> = <span class="col">u.id</span>
+<span class="kw">WHERE</span> <span class="col">gm.group_id</span> = <span class="num">1</span>
+<span class="kw">ORDER BY</span> <span class="col">gm.joined_at</span> <span class="kw">ASC</span>;</div>
+    </div>
+
+    <!-- My Groups -->
+    <div class="sql-card">
+      <div class="sql-card-header">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <span>查询我加入的群组</span>
+        <button class="copy-btn" onclick="copySql(this)">复制</button>
+      </div>
+      <div class="sql-block"><span class="kw">SELECT</span> <span class="col">g.id</span>, <span class="col">g.name</span>, <span class="col">g.created_at</span>,
+       (<span class="kw">SELECT</span> <span class="fn">COUNT</span>(*) <span class="kw">FROM</span> <span class="tbl">group_members</span> <span class="kw">WHERE</span> <span class="col">group_id</span> = <span class="col">g.id</span>) <span class="kw">AS</span> <span class="col">member_count</span>
+<span class="kw">FROM</span> <span class="tbl">user_groups</span> <span class="col">g</span>
+<span class="kw">JOIN</span> <span class="tbl">group_members</span> <span class="col">gm</span> <span class="kw">ON</span> <span class="col">g.id</span> = <span class="col">gm.group_id</span>
+<span class="kw">WHERE</span> <span class="col">gm.user_id</span> = <span class="num">1</span>;</div>
+    </div>
+  </div>
+
+  <!-- Improvement Suggestions -->
+  <div class="section">
+    <h2 class="section-title">优化建议</h2>
+    <div class="relations-list">
+      <div class="rel-item">
+        <span class="rel-badge" style="background:#fff3e0;color:#e65100;">1</span>
+        <span><strong>群聊消息表</strong> - 当前 messages 只支持私聊。建议增加 <code>group_messages</code> 表或在 messages 中添加 <code>group_id</code> 字段以支持群聊。</span>
+      </div>
+      <div class="rel-item">
+        <span class="rel-badge" style="background:#fff3e0;color:#e65100;">2</span>
+        <span><strong>消息类型</strong> - 建议增加 <code>msg_type</code> 字段（ENUM: text/image/file/voice/video），content 存储对应类型的数据。</span>
+      </div>
+      <div class="rel-item">
+        <span class="rel-badge" style="background:#fff3e0;color:#e65100;">3</span>
+        <span><strong>好友状态</strong> - 建议在 friends 表增加 <code>status</code> 字段（0=待确认, 1=已接受, 2=已拒绝），实现好友申请/验证流程。</span>
+      </div>
+      <div class="rel-item">
+        <span class="rel-badge" style="background:#fff3e0;color:#e65100;">4</span>
+        <span><strong>索引优化</strong> - 为 messages 表的 (sender_id, receiver_id, created_at) 添加联合索引，提升聊天记录查询性能。</span>
+      </div>
+      <div class="rel-item">
+        <span class="rel-badge" style="background:#fff3e0;color:#e65100;">5</span>
+        <span><strong>外键约束</strong> - user_groups.owner_id 和 group_members 的 group_id/user_id 建议添加外键约束，保证数据一致性。</span>
+      </div>
+      <div class="rel-item">
+        <span class="rel-badge" style="background:#fff3e0;color:#e65100;">6</span>
+        <span><strong>会话表</strong> - 建议增加 <code>conversations</code> 表，记录每个会话的最后一条消息、未读数等，避免每次都聚合查询 messages 表。</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Graduation Chat Database Documentation | Generated on 2026-05-17 | MySQL 8.0
+</div>
+
+<script>
+function copySql(btn) {
+  const block = btn.closest('.sql-card').querySelector('.sql-block');
+  const text = block.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '已复制!';
+    setTimeout(() => btn.textContent = '复制', 1500);
+  });
+}
+</script>
+
+</body>
+</html>

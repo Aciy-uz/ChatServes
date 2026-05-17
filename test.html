@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>接口测试</title>
+</head>
+<body>
+
+<h2>功能测试</h2>
+
+<!-- 数据库测试 -->
+<h3>1. 测试数据库</h3>
+<button onclick="testDb()">测试连接</button>
+<pre id="out1"></pre>
+<hr>
+
+<!-- RSA 测试 -->
+<h3>2. RSA 加解密</h3>
+<input id="pwd" value="123456">
+<button onclick="testRsa()">加密并解密</button>
+<pre id="out2"></pre>
+<hr>
+
+<!-- 验证码测试 -->
+<h3>3. 验证码</h3>
+<button onclick="getCaptcha()">获取验证码</button>
+<div id="captchaBox"></div>
+<input id="code" placeholder="输入验证码">
+<pre id="out3"></pre>
+<hr>
+
+<!-- 登录测试 -->
+<h3>4. 登录</h3>
+<input id="user" value="admin" placeholder="用户名"><br><br>
+<input id="pass" value="123456" placeholder="密码"><br><br>
+<button onclick="login()">登录</button>
+<div id="userInfo" style="margin:10px 0;"></div>
+<pre id="out4"></pre>
+<hr>
+
+<!-- 注册测试 -->
+<h3>5. 注册</h3>
+<input id="regUser" placeholder="用户名"><br><br>
+<input id="regPass" placeholder="密码"><br><br>
+<input id="regNick" placeholder="昵称"><br><br>
+头像: <input type="file" id="regAvatar" accept="image/*"><br><br>
+<button onclick="getRegCaptcha()">获取验证码</button>
+<div id="regCaptchaBox"></div>
+<input id="regCode" placeholder="输入验证码"><br><br>
+<button onclick="register()">注册</button>
+<pre id="out5"></pre>
+
+<script>
+const API = 'http://localhost:3000';
+let pubKey = '';
+let captchaId = '';
+
+// 获取公钥（复用）
+async function getPubKey() {
+  if (!pubKey) {
+    const res = await fetch(API + '/rsa/public-key');
+    pubKey = (await res.json()).publicKey;
+  }
+  return pubKey;
+}
+
+// RSA 加密（复用）
+async function encrypt(text) {
+  const key = await getPubKey();
+  const pem = key.replace(/-----.*-----/g, '').replace(/\s/g, '');
+  const der = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
+  const ck = await crypto.subtle.importKey('spki', der, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
+  const buf = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, ck, new TextEncoder().encode(text));
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+
+// 1. 测试数据库
+async function testDb() {
+  const res = await fetch(API + '/test-db');
+  document.getElementById('out1').textContent = JSON.stringify(await res.json(), null, 2);
+}
+
+// 2. RSA 加解密
+async function testRsa() {
+  const text = document.getElementById('pwd').value;
+  const encrypted = await encrypt(text);
+  const res = await fetch(API + '/rsa/decrypt', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ encrypted }),
+  });
+  const data = await res.json();
+  document.getElementById('out2').textContent = '密文: ' + encrypted + '\n解密: ' + data.decrypted;
+}
+
+// 3. 获取验证码
+async function getCaptcha() {
+  const res = await fetch(API + '/user/captcha');
+  const data = await res.json();
+  captchaId = data.id;
+  document.getElementById('captchaBox').innerHTML = data.svg;
+}
+
+// 4. 登录
+async function login() {
+  const encrypted = await encrypt(document.getElementById('pass').value);
+  const res = await fetch(API + '/user/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: document.getElementById('user').value,
+      encrypted,
+      captchaId,
+      captchaCode: document.getElementById('code').value,
+    }),
+  });
+  const data = await res.json();
+  document.getElementById('out4').textContent = JSON.stringify(data, null, 2);
+
+  // 登录成功显示头像
+  if (data.code === 200) {
+    const u = data.data.user;
+    document.getElementById('userInfo').innerHTML =
+      '<img src="' + u.avatarUrl + '" width="60" height="60" style="border-radius:50%;vertical-align:middle;">' +
+      ' <b>' + u.nickname + '</b> (' + u.username + ')';
+  }
+}
+
+// 5. 注册
+let regCaptchaId = '';
+
+async function getRegCaptcha() {
+  const res = await fetch(API + '/user/captcha');
+  const data = await res.json();
+  regCaptchaId = data.id;
+  document.getElementById('regCaptchaBox').innerHTML = data.svg;
+}
+
+async function register() {
+  const encrypted = await encrypt(document.getElementById('regPass').value);
+  const form = new FormData();
+  form.append('username', document.getElementById('regUser').value);
+  form.append('encrypted', encrypted);
+  form.append('nickname', document.getElementById('regNick').value);
+  form.append('captchaId', regCaptchaId);
+  form.append('captchaCode', document.getElementById('regCode').value);
+
+  const avatar = document.getElementById('regAvatar').files[0];
+  if (avatar) form.append('avatar', avatar);
+
+  const res = await fetch(API + '/user/register', { method: 'POST', body: form });
+  document.getElementById('out5').textContent = JSON.stringify(await res.json(), null, 2);
+}
+</script>
+
+</body>
+</html>
