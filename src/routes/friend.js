@@ -142,14 +142,15 @@ router.get('/requests', auth, async (req, res) => {
   }
 });
 
-// GET /friend/list - 获取好友列表
+// GET /friend/list - 获取好友列表（含未读消息数）
 router.get('/list', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT u.id, u.username, u.nickname, u.avatar, u.last_online
+      `SELECT u.id, u.username, u.nickname, u.avatar, u.last_online,
+              (SELECT COUNT(*) FROM messages WHERE sender_id = u.id AND receiver_id = ? AND is_read = 0) AS unread_count
        FROM friends f JOIN users u ON f.friend_id = u.id
        WHERE f.user_id = ?`,
-      [req.user.id]
+      [req.user.id, req.user.id]
     );
     res.json({ code: 200, data: rows });
   } catch (err) {
