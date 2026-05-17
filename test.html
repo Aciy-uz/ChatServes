@@ -99,6 +99,10 @@
 <button onclick="joinGroup()">加入群</button>
 <button onclick="quitGroup()">退出群</button>
 <button onclick="getGroupHistory()">群聊天记录</button><br><br>
+<input id="kickUserId" placeholder="被踢用户ID"><br><br>
+<button onclick="kickMember()">踢出成员</button>
+<button onclick="transferOwner()">转让群主（填入新群主ID）</button>
+<button onclick="disbandGroup()">解散群</button><br><br>
 <input id="groupMsgContent" placeholder="群消息内容" style="width:300px;">
 <button onclick="sendGroupMsg()">发送群消息</button>
 <pre id="out8"></pre>
@@ -480,6 +484,42 @@ function sendGroupMsg() {
   if (!groupId || !content) { alert('请输入群ID和消息内容'); return; }
   socket.emit('group_message', { groupId, content, type: 'text' });
   document.getElementById('groupMsgContent').value = '';
+}
+
+async function kickMember() {
+  if (!token) { document.getElementById('out8').textContent = '请先登录'; return; }
+  const groupId = Number(document.getElementById('groupId').value);
+  const userId = Number(document.getElementById('kickUserId').value);
+  const res = await fetch(API + '/group/kick', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ groupId, userId }),
+  });
+  document.getElementById('out8').textContent = JSON.stringify(await res.json(), null, 2);
+}
+
+async function transferOwner() {
+  if (!token) { document.getElementById('out8').textContent = '请先登录'; return; }
+  const groupId = Number(document.getElementById('groupId').value);
+  const newOwnerId = Number(document.getElementById('kickUserId').value);
+  const res = await fetch(API + '/group/transfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ groupId, newOwnerId }),
+  });
+  document.getElementById('out8').textContent = JSON.stringify(await res.json(), null, 2);
+}
+
+async function disbandGroup() {
+  if (!token) { document.getElementById('out8').textContent = '请先登录'; return; }
+  const groupId = Number(document.getElementById('groupId').value);
+  if (!confirm('确定要解散该群吗？此操作不可撤销！')) return;
+  const res = await fetch(API + '/group/disband', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ groupId }),
+  });
+  document.getElementById('out8').textContent = JSON.stringify(await res.json(), null, 2);
 }
 </script>
 

@@ -140,6 +140,106 @@ router.post('/quit', auth, async (req, res) => {
   }
 });
 
+// POST /group/kick - 踢出群成员（仅群主）
+router.post('/kick', auth, async (req, res) => {
+  try {
+    const { groupId, userId: targetId } = req.body;
+    const userId = req.user.id;
+
+    // 检查是否是群主
+    const [group] = await pool.query('SELECT owner_id FROM user_groups WHERE id = ?', [groupId]);
+    if (group.length === 0) {
+      return res.status(400).json({ code: 400, msg: '群不存在' });
+    }
+    if (group[0].owner_id !== userId) {
+      return res.status(403).json({ code: 403, msg: '只有群主可以踢人' });
+    }
+    if (targetId === userId) {
+      return res.status(400).json({ code: 400, msg: '不能踢出自己' });
+    }
+
+    const [result] = await pool.query(
+      'DELETE FROM group_members WHERE group_id = ? AND user_id = ?',
+      [groupId, targetId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(400).json({ code: 400, msg: '该用户不在群中' });
+    }
+
+    res.json({ code: 200, msg: '已踢出群成员' });
+  } catch (err) {
+    console.error('踢出群成员失败:', err.message);
+    res.status(500).json({ code: 500, msg: '服务器错误' });
+  }
+});
+
+// POST /group/transfer - 转让群主
+router.post('/transfer', auth, async (req, res) => {
+  try {
+    const { groupId, newOwnerId } = req.body;
+    const userId = req.user.id;
+
+    // 检查是否是群主
+    const [group] = await pool.query('SELECT owner_id FROM user_groups WHERE id = ?', [groupId]);
+    if (group.length === 0) {
+      return res.status(400).json({ code: 400, msg: '群不存在' });
+    }
+    if (group[0].owner_id !== userId) {
+      return res.status(403).json({ code: 403, msg: '只有群主可以转让群主' });
+    }
+    if (newOwnerId === userId) {
+      return res.status(400).json({ code: 400, msg: '不能转让给自己' });
+    }
+
+    // 检查目标用户是否在群中
+    const [member] = await pool.query(
+      'SELECT * FROM group_members WHERE group_id = ? AND user_id = ?',
+      [groupId, newOwnerId]
+    );
+    if (member.length === 0) {
+      return res.status(400).json({ code: 400, msg: '该用户不在群中' });
+    }
+
+    await pool.query(
+      'UPDATE user_groups SET owner_id = ? WHERE id = ?',
+      [newOwnerId, groupId]
+    );
+
+    res.json({ code: 200, msg: '群主已转让' });
+  } catch (err) {
+    console.error('转让群主失败:', err.message);
+    res.status(500).json({ code: 500, msg: '服务器错误' });
+  }
+});
+
+// POST /group/disband - 解散群（仅群主）
+router.post('/disband', auth, async (req, res) => {
+  try {
+    const { groupId } = req.body;
+    const userId = req.user.id;
+
+    // 检查是否是群主
+    const [group] = await pool.query('SELECT owner_id FROM user_groups WHERE id = ?', [groupId]);
+    if (group.length === 0) {
+      return res.status(400).json({ code: 400, msg: '群不存在' });
+    }
+    if (group[0].owner_id !== userId) {
+      return res.status(403).json({ code: 403, msg: '只有群主可以解散群' });
+    }
+
+    // 删除群消息、群成员、群
+    await pool.query('DELETE FROM group_messages WHERE group_id = ?', [groupId]);
+    await pool.query('DELETE FROM group_members WHERE group_id = ?', [groupId]);
+    await pool.query('DELETE FROM user_groups WHERE id = ?', [groupId]);
+
+    res.json({ code: 200, msg: '群已解散' });
+  } catch (err) {
+    console.error('解散群失败:', err.message);
+    res.status(500).json({ code: 500, msg: '服务器错误' });
+  }
+});
+
 // GET /group/history - 获取群聊天记录（分页）
 router.get('/history', auth, async (req, res) => {
   try {
