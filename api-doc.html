@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatServer API 接口文档</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; line-height: 1.6; }
+    .header { background: linear-gradient(135deg, #1890ff, #722ed1); color: #fff; padding: 40px 0; text-align: center; }
+    .header h1 { font-size: 28px; margin-bottom: 8px; }
+    .header p { opacity: 0.85; font-size: 14px; }
+    .container { max-width: 960px; margin: 0 auto; padding: 20px; }
+    .nav { background: #fff; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .nav h3 { margin-bottom: 12px; color: #666; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+    .nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+    .nav a { color: #1890ff; text-decoration: none; font-size: 14px; padding: 4px 0; display: block; }
+    .nav a:hover { text-decoration: underline; }
+    .section { background: #fff; border-radius: 8px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+    .section-title { background: #fafafa; padding: 16px 24px; border-bottom: 1px solid #eee; font-size: 18px; font-weight: 600; }
+    .api-item { padding: 20px 24px; border-bottom: 1px solid #f0f0f0; }
+    .api-item:last-child { border-bottom: none; }
+    .api-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+    .method { padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; color: #fff; min-width: 55px; text-align: center; }
+    .method-get { background: #52c41a; }
+    .method-post { background: #1890ff; }
+    .method-put { background: #fa8c16; }
+    .path { font-family: 'Courier New', monospace; font-size: 15px; font-weight: 600; color: #333; }
+    .auth-badge { background: #fff7e6; color: #d46b08; border: 1px solid #ffd591; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+    .desc { color: #666; font-size: 14px; margin-bottom: 12px; }
+    .params-title { font-size: 13px; color: #999; margin-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+    th { background: #fafafa; text-align: left; padding: 8px 12px; border: 1px solid #eee; color: #666; font-weight: 600; }
+    td { padding: 8px 12px; border: 1px solid #eee; }
+    td code { background: #f5f5f5; padding: 1px 6px; border-radius: 3px; font-size: 12px; color: #d4380d; }
+    .example { background: #f6f8fa; border-radius: 6px; padding: 12px 16px; font-family: 'Courier New', monospace; font-size: 13px; overflow-x: auto; white-space: pre; color: #333; }
+    .ws-section { background: #fff; border-radius: 8px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+    .ws-item { padding: 16px 24px; border-bottom: 1px solid #f0f0f0; }
+    .ws-item:last-child { border-bottom: none; }
+    .ws-event { font-family: 'Courier New', monospace; font-size: 14px; font-weight: 600; color: #722ed1; }
+    .ws-dir { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 8px; }
+    .ws-dir-c2s { background: #e6f7ff; color: #1890ff; }
+    .ws-dir-s2c { background: #f6ffed; color: #52c41a; }
+    .ws-dir-both { background: #fff7e6; color: #fa8c16; }
+    .db-section { background: #fff; border-radius: 8px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+    .db-table { padding: 16px 24px; border-bottom: 1px solid #f0f0f0; }
+    .db-table:last-child { border-bottom: none; }
+    .db-name { font-family: 'Courier New', monospace; font-size: 16px; font-weight: 600; color: #333; margin-bottom: 12px; }
+    .footer { text-align: center; padding: 30px; color: #999; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>ChatServer API 接口文档</h1>
+  <p>仿微信即时通讯后端 &mdash; Express + MySQL + Socket.io</p>
+  <p>Base URL: http://localhost:3000</p>
+</div>
+
+<div class="container">
+
+<!-- 目录导航 -->
+<div class="nav">
+  <h3>接口目录</h3>
+  <div class="nav-grid">
+    <a href="#rsa">RSA 加密</a>
+    <a href="#user">用户系统</a>
+    <a href="#friend">好友系统</a>
+    <a href="#message">消息系统</a>
+    <a href="#group">群聊系统</a>
+    <a href="#websocket">WebSocket 事件</a>
+    <a href="#database">数据库设计</a>
+  </div>
+</div>
+
+<!-- 通用说明 -->
+<div class="section">
+  <div class="section-title">通用说明</div>
+  <div class="api-item">
+    <p class="desc"><strong>响应格式：</strong>所有接口返回 JSON，成功格式为 <code>{ code: 200, msg: "...", data: {...} }</code>，失败为 <code>{ code: 4xx/5xx, msg: "..." }</code></p>
+    <p class="desc"><strong>鉴权方式：</strong>需要登录的接口在请求头添加 <code>Authorization: Bearer &lt;token&gt;</code></p>
+    <p class="desc"><strong>Content-Type：</strong>JSON 请求使用 <code>application/json</code>，文件上传使用 <code>multipart/form-data</code></p>
+  </div>
+</div>
+
+<!-- RSA 加密 -->
+<div class="section" id="rsa">
+  <div class="section-title">RSA 加密</div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-get">GET</span>
+      <span class="path">/rsa/public-key</span>
+    </div>
+    <p class="desc">获取 RSA 公钥，用于前端加密密码</p>
+    <div class="example">{
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBg..."
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/rsa/decrypt</span>
+    </div>
+    <p class="desc">RSA 解密接口，传入加密后的 Base64 密文</p>
+    <p class="params-title">请求参数 (Body)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>encrypted</code></td><td>string</td><td>是</td><td>RSA 加密后的 Base64 字符串</td></tr>
+    </table>
+    <div class="example">{
+  "decrypted": "123456"
+}</div>
+  </div>
+</div>
+
+<!-- 用户系统 -->
+<div class="section" id="user">
+  <div class="section-title">用户系统</div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-get">GET</span>
+      <span class="path">/user/captcha</span>
+    </div>
+    <p class="desc">获取验证码图片（SVG 格式），有效期 5 分钟</p>
+    <div class="example">{
+  "id": "m1a2b3c4d",
+  "svg": "&lt;svg ...&gt;...&lt;/svg&gt;"
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/user/register</span>
+    </div>
+    <p class="desc">用户注册（multipart/form-data）</p>
+    <p class="params-title">请求参数 (Body)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>username</code></td><td>string</td><td>是</td><td>用户名（唯一）</td></tr>
+      <tr><td><code>encrypted</code></td><td>string</td><td>是</td><td>RSA 加密后的密码</td></tr>
+      <tr><td><code>nickname</code></td><td>string</td><td>否</td><td>昵称，默认为用户名</td></tr>
+      <tr><td><code>captchaId</code></td><td>string</td><td>是</td><td>验证码 ID</td></tr>
+      <tr><td><code>captchaCode</code></td><td>string</td><td>是</td><td>验证码</td></tr>
+      <tr><td><code>avatar</code></td><td>file</td><td>否</td><td>头像图片，默认使用默认头像</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/user/login</span>
+    </div>
+    <p class="desc">用户登录，成功返回 JWT token</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>username</code></td><td>string</td><td>是</td><td>用户名</td></tr>
+      <tr><td><code>encrypted</code></td><td>string</td><td>是</td><td>RSA 加密后的密码</td></tr>
+      <tr><td><code>captchaId</code></td><td>string</td><td>是</td><td>验证码 ID</td></tr>
+      <tr><td><code>captchaCode</code></td><td>string</td><td>是</td><td>验证码</td></tr>
+    </table>
+    <div class="example">{
+  "code": 200,
+  "msg": "登录成功",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "user": { "id": 1, "username": "admin", "nickname": "管理员", "avatar": "/uploads/xxx.png", "avatarUrl": "http://localhost:3000/uploads/xxx.png" }
+  }
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-get">GET</span>
+      <span class="path">/user/search</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">按用户名或昵称模糊搜索用户，排除自己，最多返回 20 条</p>
+    <p class="params-title">请求参数 (Query)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>keyword</code></td><td>string</td><td>是</td><td>搜索关键字</td></tr>
+    </table>
+    <div class="example">{
+  "code": 200,
+  "data": [
+    { "id": 2, "username": "admin", "nickname": "管理员", "avatar": "/uploads/xxx.png" }
+  ]
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-get">GET</span>
+      <span class="path">/user/profile</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">获取当前登录用户的资料</p>
+    <div class="example">{
+  "code": 200,
+  "data": { "id": 1, "username": "admin", "nickname": "管理员", "avatar": "/uploads/xxx.png", "avatarUrl": "...", "created_at": "...", "last_online": "..." }
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-put">PUT</span>
+      <span class="path">/user/profile</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">修改当前用户昵称</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>nickname</code></td><td>string</td><td>是</td><td>新昵称</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/user/avatar</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">修改当前用户头像（multipart/form-data）</p>
+    <p class="params-title">请求参数 (Body)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>avatar</code></td><td>file</td><td>是</td><td>头像图片文件</td></tr>
+    </table>
+    <div class="example">{
+  "code": 200,
+  "msg": "头像修改成功",
+  "data": { "avatarUrl": "http://localhost:3000/uploads/chat_xxx.png" }
+}</div>
+  </div>
+</div>
+
+<!-- 好友系统 -->
+<div class="section" id="friend">
+  <div class="section-title">好友系统</div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/friend/request</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">发送好友申请（不能申请自己、不能重复申请、已是好友则拒绝）</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>friendId</code></td><td>number</td><td>是</td><td>目标用户 ID</td></tr>
+      <tr><td><code>message</code></td><td>string</td><td>否</td><td>申请验证消息</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/friend/accept</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">接受好友申请，自动建立双向好友关系</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>requestId</code></td><td>number</td><td>是</td><td>好友申请 ID</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/friend/reject</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">拒绝好友申请</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>requestId</code></td><td>number</td><td>是</td><td>好友申请 ID</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-get">GET</span>
+      <span class="path">/friend/requests</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">获取收到的待处理好友申请列表</p>
+    <div class="example">{
+  "code": 200,
+  "data": [
+    { "id": 1, "from_user_id": 3, "message": "你好", "created_at": "...", "username": "test", "nickname": "测试用户", "avatar": "..." }
+  ]
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-get">GET</span>
+      <span class="path">/friend/list</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">获取好友列表，每个好友包含未读消息数</p>
+    <div class="example">{
+  "code": 200,
+  "data": [
+    { "id": 2, "username": "admin", "nickname": "管理员", "avatar": "...", "last_online": "...", "unread_count": 3 }
+  ]
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/friend/delete</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">删除好友（双向解除关系）</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>friendId</code></td><td>number</td><td>是</td><td>要删除的好友 ID</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- 消息系统 -->
+<div class="section" id="message">
+  <div class="section-title">消息系统</div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-get">GET</span>
+      <span class="path">/message/history</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">获取与某好友的聊天记录（分页，按时间正序）</p>
+    <p class="params-title">请求参数 (Query)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>friendId</code></td><td>number</td><td>是</td><td>好友用户 ID</td></tr>
+      <tr><td><code>page</code></td><td>number</td><td>否</td><td>页码，默认 1</td></tr>
+      <tr><td><code>size</code></td><td>number</td><td>否</td><td>每页条数，默认 20</td></tr>
+    </table>
+    <div class="example">{
+  "code": 200,
+  "data": [
+    { "id": 1, "sender_id": 1, "receiver_id": 2, "content": "你好", "type": "text", "is_read": 1, "is_recalled": 0, "created_at": "..." }
+  ]
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-get">GET</span>
+      <span class="path">/message/unread</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">获取未读消息统计（按发送者分组）</p>
+    <div class="example">{
+  "code": 200,
+  "data": [
+    { "sender_id": 2, "count": 5 },
+    { "sender_id": 3, "count": 2 }
+  ]
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/message/recall</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">撤回已发送的消息（仅发送者可操作，2 分钟内有效）</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>messageId</code></td><td>number</td><td>是</td><td>消息 ID</td></tr>
+    </table>
+    <div class="example">{
+  "code": 200,
+  "msg": "撤回成功",
+  "data": { "receiverId": 2 }
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/message/upload</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">上传聊天文件/图片（支持图片、PDF、Office、压缩包等，最大 10MB）</p>
+    <p class="params-title">请求参数 (Body - multipart/form-data)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>file</code></td><td>file</td><td>是</td><td>文件</td></tr>
+    </table>
+    <div class="example">{
+  "code": 200,
+  "data": {
+    "url": "http://localhost:3000/uploads/chat_123456.png",
+    "type": "image",
+    "filename": "photo.png",
+    "size": 102400
+  }
+}</div>
+  </div>
+</div>
+
+<!-- 群聊系统 -->
+<div class="section" id="group">
+  <div class="section-title">群聊系统</div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/group/create</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">创建群聊，创建者自动成为群主并加入群</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>name</code></td><td>string</td><td>是</td><td>群名称</td></tr>
+      <tr><td><code>members</code></td><td>number[]</td><td>否</td><td>初始成员 ID 数组</td></tr>
+    </table>
+    <div class="example">{
+  "code": 200,
+  "msg": "创建成功",
+  "data": { "groupId": 1 }
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-get">GET</span>
+      <span class="path">/group/list</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">获取当前用户所在的群列表</p>
+    <div class="example">{
+  "code": 200,
+  "data": [
+    { "id": 1, "name": "技术交流群", "owner_id": 1, "created_at": "..." }
+  ]
+}</div>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-get">GET</span>
+      <span class="path">/group/members</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">获取群成员列表</p>
+    <p class="params-title">请求参数 (Query)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>groupId</code></td><td>number</td><td>是</td><td>群 ID</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/group/join</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">加入群聊</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>groupId</code></td><td>number</td><td>是</td><td>群 ID</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/group/quit</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">退出群聊（群主不能退出，需先转让或解散）</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>groupId</code></td><td>number</td><td>是</td><td>群 ID</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/group/kick</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">踢出群成员（仅群主可操作）</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>groupId</code></td><td>number</td><td>是</td><td>群 ID</td></tr>
+      <tr><td><code>userId</code></td><td>number</td><td>是</td><td>要踢出的用户 ID</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/group/transfer</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">转让群主（仅群主可操作，目标用户必须在群中）</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>groupId</code></td><td>number</td><td>是</td><td>群 ID</td></tr>
+      <tr><td><code>newOwnerId</code></td><td>number</td><td>是</td><td>新群主用户 ID</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/group/disband</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">解散群聊（仅群主可操作，级联删除群消息和成员）</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>groupId</code></td><td>number</td><td>是</td><td>群 ID</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-get">GET</span>
+      <span class="path">/group/history</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">获取群聊天记录（分页）</p>
+    <p class="params-title">请求参数 (Query)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>groupId</code></td><td>number</td><td>是</td><td>群 ID</td></tr>
+      <tr><td><code>page</code></td><td>number</td><td>否</td><td>页码，默认 1</td></tr>
+      <tr><td><code>size</code></td><td>number</td><td>否</td><td>每页条数，默认 20</td></tr>
+    </table>
+  </div>
+
+  <div class="api-item">
+    <div class="api-header">
+      <span class="method method-post">POST</span>
+      <span class="path">/group/recall</span>
+      <span class="auth-badge">需要登录</span>
+    </div>
+    <p class="desc">撤回群消息（仅发送者，2 分钟内有效）</p>
+    <p class="params-title">请求参数 (Body - JSON)</p>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td><code>messageId</code></td><td>number</td><td>是</td><td>消息 ID</td></tr>
+    </table>
+    <div class="example">{
+  "code": 200,
+  "msg": "撤回成功",
+  "data": { "groupId": 1 }
+}</div>
+  </div>
+</div>
+
+<!-- WebSocket 事件 -->
+<div class="ws-section" id="websocket">
+  <div class="section-title">WebSocket 事件</div>
+  <div style="padding: 16px 24px; color: #666; font-size: 14px; border-bottom: 1px solid #f0f0f0;">
+    连接地址: <code>ws://localhost:3000</code> &nbsp;|&nbsp; 认证方式: <code>{ auth: { token: "Bearer xxx" } }</code>
+  </div>
+
+  <div class="ws-item">
+    <span class="ws-event">private_message</span>
+    <span class="ws-dir ws-dir-both">双向</span>
+    <p class="desc">私聊消息收发。客户端发送 <code>{ receiverId, content, type }</code>，服务端推送给接收者和发送者回执。</p>
+    <div class="example">// 发送
+socket.emit('private_message', { receiverId: 2, content: '你好', type: 'text' });
+
+// 接收（type 可选: text | image | file）
+socket.on('private_message', (msg) => {
+  // msg: { id, senderId, receiverId, content, type, createdAt }
+});</div>
+  </div>
+
+  <div class="ws-item">
+    <span class="ws-event">group_message</span>
+    <span class="ws-dir ws-dir-both">双向</span>
+    <p class="desc">群聊消息收发。客户端发送 <code>{ groupId, content, type }</code>，服务端广播给群内所有成员。</p>
+    <div class="example">socket.emit('group_message', { groupId: 1, content: '大家好', type: 'text' });
+
+socket.on('group_message', (msg) => {
+  // msg: { id, groupId, senderId, content, type, createdAt }
+});</div>
+  </div>
+
+  <div class="ws-item">
+    <span class="ws-event">message_read</span>
+    <span class="ws-dir ws-dir-c2s">客户端 → 服务端</span>
+    <p class="desc">标记消息已读。发送 <code>{ senderId }</code>，将该用户发来的所有未读消息标记为已读。</p>
+  </div>
+
+  <div class="ws-item">
+    <span class="ws-event">messages_read</span>
+    <span class="ws-dir ws-dir-s2c">服务端 → 客户端</span>
+    <p class="desc">通知发送者消息已被对方读取。<code>{ readerId }</code></p>
+  </div>
+
+  <div class="ws-item">
+    <span class="ws-event">message_recall</span>
+    <span class="ws-dir ws-dir-both">双向</span>
+    <p class="desc">私聊消息撤回通知。客户端发送 <code>{ messageId, receiverId }</code>，服务端推送给接收者 <code>{ messageId, senderId }</code>。</p>
+  </div>
+
+  <div class="ws-item">
+    <span class="ws-event">group_message_recall</span>
+    <span class="ws-dir ws-dir-both">双向</span>
+    <p class="desc">群消息撤回通知。客户端发送 <code>{ messageId, groupId }</code>，服务端广播给群内所有成员 <code>{ messageId, senderId, groupId }</code>。</p>
+  </div>
+
+  <div class="ws-item">
+    <span class="ws-event">online_users</span>
+    <span class="ws-dir ws-dir-s2c">服务端 → 客户端</span>
+    <p class="desc">连接成功后推送当前在线用户 ID 数组。<code>[1, 2, 3]</code></p>
+  </div>
+
+  <div class="ws-item">
+    <span class="ws-event">user_online</span>
+    <span class="ws-dir ws-dir-s2c">服务端 → 客户端</span>
+    <p class="desc">广播某用户上线。<code>{ userId }</code></p>
+  </div>
+
+  <div class="ws-item">
+    <span class="ws-event">user_offline</span>
+    <span class="ws-dir ws-dir-s2c">服务端 → 客户端</span>
+    <p class="desc">广播某用户下线。<code>{ userId, lastOnline }</code></p>
+  </div>
+
+  <div class="ws-item">
+    <span class="ws-event">unread_messages</span>
+    <span class="ws-dir ws-dir-s2c">服务端 → 客户端</span>
+    <p class="desc">连接成功后推送未读消息，按发送者分组。<code>{ senderId: [msg1, msg2, ...] }</code></p>
+  </div>
+</div>
+
+<!-- 数据库设计 -->
+<div class="db-section" id="database">
+  <div class="section-title">数据库设计</div>
+
+  <div class="db-table">
+    <div class="db-name">users - 用户表</div>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>id</code></td><td>INT PK</td><td>用户 ID</td></tr>
+      <tr><td><code>username</code></td><td>VARCHAR(50) UNIQUE</td><td>用户名</td></tr>
+      <tr><td><code>password</code></td><td>VARCHAR(255)</td><td>密码（明文存储，前端 RSA 加密传输）</td></tr>
+      <tr><td><code>nickname</code></td><td>VARCHAR(50)</td><td>昵称</td></tr>
+      <tr><td><code>avatar</code></td><td>VARCHAR(255)</td><td>头像路径</td></tr>
+      <tr><td><code>created_at</code></td><td>TIMESTAMP</td><td>注册时间</td></tr>
+      <tr><td><code>last_online</code></td><td>TIMESTAMP</td><td>最后在线时间</td></tr>
+    </table>
+  </div>
+
+  <div class="db-table">
+    <div class="db-name">friends - 好友关系表</div>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>id</code></td><td>INT PK</td><td>记录 ID</td></tr>
+      <tr><td><code>user_id</code></td><td>INT FK</td><td>用户 ID</td></tr>
+      <tr><td><code>friend_id</code></td><td>INT FK</td><td>好友 ID</td></tr>
+      <tr><td><code>created_at</code></td><td>TIMESTAMP</td><td>建立关系时间</td></tr>
+    </table>
+  </div>
+
+  <div class="db-table">
+    <div class="db-name">friend_requests - 好友申请表</div>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>id</code></td><td>INT PK</td><td>申请 ID</td></tr>
+      <tr><td><code>from_user_id</code></td><td>INT FK</td><td>申请人 ID</td></tr>
+      <tr><td><code>to_user_id</code></td><td>INT FK</td><td>被申请人 ID</td></tr>
+      <tr><td><code>status</code></td><td>ENUM</td><td>pending / accepted / rejected</td></tr>
+      <tr><td><code>message</code></td><td>VARCHAR(200)</td><td>申请验证消息</td></tr>
+      <tr><td><code>created_at</code></td><td>TIMESTAMP</td><td>申请时间</td></tr>
+    </table>
+  </div>
+
+  <div class="db-table">
+    <div class="db-name">messages - 私聊消息表</div>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>id</code></td><td>INT PK</td><td>消息 ID</td></tr>
+      <tr><td><code>sender_id</code></td><td>INT FK</td><td>发送者 ID</td></tr>
+      <tr><td><code>receiver_id</code></td><td>INT FK</td><td>接收者 ID</td></tr>
+      <tr><td><code>content</code></td><td>TEXT</td><td>消息内容（文字/图片URL/文件URL）</td></tr>
+      <tr><td><code>type</code></td><td>ENUM</td><td>text / image / file</td></tr>
+      <tr><td><code>is_read</code></td><td>TINYINT(1)</td><td>是否已读</td></tr>
+      <tr><td><code>is_recalled</code></td><td>TINYINT(1)</td><td>是否已撤回</td></tr>
+      <tr><td><code>created_at</code></td><td>TIMESTAMP</td><td>发送时间</td></tr>
+    </table>
+  </div>
+
+  <div class="db-table">
+    <div class="db-name">user_groups - 群表</div>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>id</code></td><td>INT PK</td><td>群 ID</td></tr>
+      <tr><td><code>name</code></td><td>VARCHAR(100)</td><td>群名称</td></tr>
+      <tr><td><code>owner_id</code></td><td>INT</td><td>群主 ID</td></tr>
+      <tr><td><code>created_at</code></td><td>TIMESTAMP</td><td>创建时间</td></tr>
+    </table>
+  </div>
+
+  <div class="db-table">
+    <div class="db-name">group_members - 群成员表</div>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>group_id</code></td><td>INT FK (PK)</td><td>群 ID</td></tr>
+      <tr><td><code>user_id</code></td><td>INT FK (PK)</td><td>用户 ID</td></tr>
+      <tr><td><code>joined_at</code></td><td>TIMESTAMP</td><td>加入时间</td></tr>
+    </table>
+  </div>
+
+  <div class="db-table">
+    <div class="db-name">group_messages - 群消息表</div>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>id</code></td><td>INT PK</td><td>消息 ID</td></tr>
+      <tr><td><code>group_id</code></td><td>INT FK</td><td>群 ID</td></tr>
+      <tr><td><code>sender_id</code></td><td>INT FK</td><td>发送者 ID</td></tr>
+      <tr><td><code>content</code></td><td>TEXT</td><td>消息内容</td></tr>
+      <tr><td><code>type</code></td><td>ENUM</td><td>text / image / file</td></tr>
+      <tr><td><code>is_recalled</code></td><td>TINYINT(1)</td><td>是否已撤回</td></tr>
+      <tr><td><code>created_at</code></td><td>TIMESTAMP</td><td>发送时间</td></tr>
+    </table>
+  </div>
+</div>
+
+</div>
+
+<div class="footer">
+  ChatServer API Documentation &mdash; 仿微信即时通讯后端毕业设计
+</div>
+
+</body>
+</html>
