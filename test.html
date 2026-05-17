@@ -49,11 +49,37 @@
 <input id="regCode" placeholder="输入验证码"><br><br>
 <button onclick="register()">注册</button>
 <pre id="out5"></pre>
+<hr>
 
+<!-- 好友测试 -->
+<h3>6. 好友</h3>
+<input id="friendId" placeholder="好友用户ID"><br><br>
+<button onclick="addFriend()">添加好友</button>
+<button onclick="getFriends()">好友列表</button>
+<pre id="out6"></pre>
+<hr>
+
+<!-- 私聊测试 -->
+<h3>7. 私聊（WebSocket）</h3>
+<div id="wsStatus" style="padding:5px;margin:5px 0;background:#eee;">未连接</div>
+<button onclick="connectWs()">连接 WebSocket</button>
+<button onclick="disconnectWs()">断开</button><br><br>
+<b>在线用户:</b> <span id="onlineList">无</span><br><br>
+<input id="toUser" placeholder="接收者用户ID"><br><br>
+<input id="msgContent" placeholder="消息内容" style="width:300px;">
+<button onclick="sendMsg()">发送</button><br><br>
+<button onclick="markRead()">标记已读（填入发送者ID）</button>
+<button onclick="getHistory()">获取聊天记录</button>
+<button onclick="getUnread()">获取未读统计</button>
+<div id="chatBox" style="border:1px solid #ccc;height:300px;overflow-y:auto;padding:10px;margin:5px 0;"></div>
+<pre id="out7"></pre>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
 const API = 'http://localhost:3000';
 let pubKey = '';
 let captchaId = '';
+let token = '';
 
 // 获取公钥（复用）
 async function getPubKey() {
@@ -119,6 +145,7 @@ async function login() {
 
   // 登录成功显示头像
   if (data.code === 200) {
+    token = data.data.token;
     const u = data.data.user;
     document.getElementById('userInfo').innerHTML =
       '<img src="' + u.avatarUrl + '" width="60" height="60" style="border-radius:50%;vertical-align:middle;">' +
@@ -150,6 +177,150 @@ async function register() {
 
   const res = await fetch(API + '/user/register', { method: 'POST', body: form });
   document.getElementById('out5').textContent = JSON.stringify(await res.json(), null, 2);
+}
+
+// 6. 好友
+async function addFriend() {
+  if (!token) { document.getElementById('out6').textContent = '请先登录'; return; }
+  const res = await fetch(API + '/friend/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ friendId: Number(document.getElementById('friendId').value) }),
+  });
+  document.getElementById('out6').textContent = JSON.stringify(await res.json(), null, 2);
+}
+
+async function getFriends() {
+  if (!token) { document.getElementById('out6').textContent = '请先登录'; return; }
+  const res = await fetch(API + '/friend/list', {
+    headers: { 'Authorization': 'Bearer ' + token },
+  });
+  document.getElementById('out6').textContent = JSON.stringify(await res.json(), null, 2);
+}
+
+// 7. WebSocket 私聊
+let socket = null;
+let myUserId = null;
+
+function appendChat(text, type = 'info') {
+  const box = document.getElementById('chatBox');
+  const div = document.createElement('div');
+  div.style.margin = '4px 0';
+  div.style.color = type === 'sent' ? '#1890ff' : type === 'received' ? '#52c41a' : '#999';
+  div.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function connectWs() {
+  if (!token) { alert('请先登录'); return; }
+
+  // 从 token 解析 userId（简单的 base64 解码）
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    myUserId = payload.id;
+  } catch {}
+
+  socket = io(API, { auth: { token } });
+
+  socket.on('connect', () => {
+    document.getElementById('wsStatus').style.background = '#d4edda';
+    document.getElementById('wsStatus').textContent = '已连接 (用户ID: ' + myUserId + ')';
+    appendChat('已连接到服务器');
+  });
+
+  socket.on('connect_error', (err) => {
+    document.getElementById('wsStatus').style.background = '#f8d7da';
+    document.getElementById('wsStatus').textContent = '连接失败: ' + err.message;
+  });
+
+  socket.on('online_users', (users) => {
+    document.getElementById('onlineList').textContent = users.length > 0 ? users.join(', ') : '无';
+  });
+
+  socket.on('user_online', ({ userId }) => {
+    appendChat(`用户 ${userId} 上线`);
+    // 刷新在线列表
+    const el = document.getElementById('onlineList');
+    const current = el.textContent === '无' ? [] : el.textContent.split(', ').map(Number);
+    if (!current.includes(userId)) { current.push(userId); el.textContent = current.join(', '); }
+  });
+
+  socket.on('user_offline', ({ userId }) => {
+    appendChat(`用户 ${userId} 下线`);
+    const el = document.getElementById('onlineList');
+    const current = el.textContent.split(', ').map(Number).filter(id => id !== userId);
+    el.textContent = current.length > 0 ? current.join(', ') : '无';
+  });
+
+  socket.on('private_message', (msg) => {
+    console.log('收到消息:', msg, 'myUserId:', myUserId, '类型:', typeof msg.senderId, typeof myUserId);
+    if (Number(msg.senderId) === Number(myUserId)) {
+      appendChat(`[我 -> 用户${msg.receiverId}] ${msg.content}`, 'sent');
+    } else {
+      appendChat(`[用户${msg.senderId} -> 我] ${msg.content}`, 'received');
+    }
+  });
+
+  socket.on('unread_messages', (grouped) => {
+    for (const [senderId, messages] of Object.entries(grouped)) {
+      appendChat(`收到来自用户${senderId}的 ${messages.length} 条未读消息`, 'received');
+      for (const msg of messages) {
+        appendChat(`  [用户${senderId}] ${msg.content}`, 'received');
+      }
+    }
+  });
+
+  socket.on('messages_read', ({ readerId }) => {
+    appendChat(`用户${readerId} 已读你的消息`);
+  });
+
+  socket.on('disconnect', () => {
+    document.getElementById('wsStatus').style.background = '#eee';
+    document.getElementById('wsStatus').textContent = '已断开';
+    appendChat('已断开连接');
+  });
+}
+
+function disconnectWs() {
+  if (socket) { socket.disconnect(); socket = null; }
+}
+
+function sendMsg() {
+  if (!socket) { alert('请先连接 WebSocket'); return; }
+  const receiverId = Number(document.getElementById('toUser').value);
+  const content = document.getElementById('msgContent').value;
+  if (!receiverId || !content) { alert('请输入接收者ID和消息内容'); return; }
+  socket.emit('private_message', { receiverId, content, type: 'text' });
+  document.getElementById('msgContent').value = '';
+}
+
+function markRead() {
+  if (!socket) { alert('请先连接 WebSocket'); return; }
+  const senderId = Number(document.getElementById('toUser').value);
+  if (!senderId) { alert('请输入发送者ID'); return; }
+  socket.emit('message_read', { senderId });
+  appendChat(`已标记用户${senderId}的消息为已读`);
+}
+
+async function getHistory() {
+  if (!token) { alert('请先登录'); return; }
+  const friendId = document.getElementById('toUser').value;
+  if (!friendId) { alert('请输入好友ID'); return; }
+  const res = await fetch(API + '/message/history?friendId=' + friendId, {
+    headers: { 'Authorization': 'Bearer ' + token },
+  });
+  const data = await res.json();
+  document.getElementById('out7').textContent = JSON.stringify(data, null, 2);
+}
+
+async function getUnread() {
+  if (!token) { alert('请先登录'); return; }
+  const res = await fetch(API + '/message/unread', {
+    headers: { 'Authorization': 'Bearer ' + token },
+  });
+  const data = await res.json();
+  document.getElementById('out7').textContent = JSON.stringify(data, null, 2);
 }
 </script>
 

@@ -1,9 +1,13 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const path = require('path');
 const pool = require('./db');
 const rsaRouter = require('./routes/rsa');
 const userRouter = require('./routes/user');
+const friendRouter = require('./routes/friend');
+const messageRouter = require('./routes/message');
+const { initSocket } = require('./socket');
 
 const app = express();
 const PORT = 3000;
@@ -47,9 +51,28 @@ app.use('/rsa', rsaRouter);
 app.use('/user', userRouter);
 
 // =============================================
-// 启动服务
+// 好友相关路由（需要 token）
 // =============================================
 
-app.listen(PORT, () => {
+// /friend/add  - 添加好友（双向关系）
+// /friend/list - 获取好友列表
+app.use('/friend', friendRouter);
+
+// =============================================
+// 消息相关路由（需要 token）
+// =============================================
+
+// /message/history - 获取聊天记录
+// /message/unread  - 获取未读消息统计
+app.use('/message', messageRouter);
+
+// =============================================
+// 启动服务（HTTP + WebSocket）
+// =============================================
+
+const server = http.createServer(app);
+initSocket(server);
+
+server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
