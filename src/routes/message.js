@@ -1,7 +1,23 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
 const pool = require('../db');
 const { verify } = require('../utils/jwt');
+
+// 聊天文件上传配置（支持图片和常见文件）
+const chatStorage = multer.diskStorage({
+  destination: path.join(__dirname, '..', 'uploads'),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, 'chat_' + Date.now() + ext);
+  },
+});
+
+const chatUpload = multer({
+  storage: chatStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
 
 // 验证 token 的中间件
 function auth(req, res, next) {
@@ -84,6 +100,30 @@ router.post('/recall', auth, async (req, res) => {
     res.json({ code: 200, msg: '撤回成功', data: { receiverId: message.receiver_id } });
   } catch (err) {
     console.error('撤回消息失败:', err.message);
+    res.status(500).json({ code: 500, msg: '服务器错误' });
+  }
+});
+
+// POST /message/upload - 上传聊天文件/图片
+router.post('/upload', auth, chatUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ code: 400, msg: '请选择文件' });
+
+    const fileUrl = 'http://localhost:3000/uploads/' + req.file.filename;
+    const isImage = req.file.mimetype.startsWith('image/');
+    const type = isImage ? 'image' : 'file';
+
+    res.json({
+      code: 200,
+      data: {
+        url: fileUrl,
+        type,
+        filename: req.file.originalname,
+        size: req.file.size,
+      },
+    });
+  } catch (err) {
+    console.error('上传文件失败:', err.message);
     res.status(500).json({ code: 500, msg: '服务器错误' });
   }
 });

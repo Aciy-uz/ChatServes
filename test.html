@@ -90,7 +90,9 @@
 <b>在线用户:</b> <span id="onlineList">无</span><br><br>
 <input id="toUser" placeholder="接收者用户ID"><br><br>
 <input id="msgContent" placeholder="消息内容" style="width:300px;">
-<button onclick="sendMsg()">发送</button><br><br>
+<button onclick="sendMsg()">发送</button>
+<button onclick="sendFile()">发送文件/图片</button>
+<input type="file" id="chatFile" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar"><br><br>
 <button onclick="markRead()">标记已读（填入发送者ID）</button>
 <button onclick="getHistory()">获取聊天记录</button>
 <button onclick="getUnread()">获取未读统计</button><br><br>
@@ -333,12 +335,24 @@ async function updateAvatar() {
 let socket = null;
 let myUserId = null;
 
-function appendChat(text, type = 'info') {
+function appendChat(text, type = 'info', msgId) {
   const box = document.getElementById('chatBox');
   const div = document.createElement('div');
   div.style.margin = '4px 0';
   div.style.color = type === 'sent' ? '#1890ff' : type === 'received' ? '#52c41a' : '#999';
+  if (msgId) div.dataset.msgId = msgId;
   div.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function appendChatHtml(html, type = 'info', msgId) {
+  const box = document.getElementById('chatBox');
+  const div = document.createElement('div');
+  div.style.margin = '4px 0';
+  div.style.color = type === 'sent' ? '#1890ff' : type === 'received' ? '#52c41a' : '#999';
+  if (msgId) div.dataset.msgId = msgId;
+  div.innerHTML = `[${new Date().toLocaleTimeString()}] ${html}`;
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 }
@@ -386,10 +400,15 @@ function connectWs() {
 
   socket.on('private_message', (msg) => {
     console.log('收到消息:', msg, 'myUserId:', myUserId, '类型:', typeof msg.senderId, typeof myUserId);
-    if (Number(msg.senderId) === Number(myUserId)) {
-      appendChat(`[ID:${msg.id}] [我 -> 用户${msg.receiverId}] ${msg.content}`, 'sent');
+    const isMine = Number(msg.senderId) === Number(myUserId);
+    const prefix = `[ID:${msg.id}] ${isMine ? '[我 -> 用户' + msg.receiverId + ']' : '[用户' + msg.senderId + ' -> 我]'}`;
+
+    if (msg.type === 'image') {
+      appendChatHtml(`${prefix} <img src="${msg.content}" style="max-width:200px;max-height:200px;cursor:pointer;" onclick="window.open(this.src)">`, isMine ? 'sent' : 'received', msg.id);
+    } else if (msg.type === 'file') {
+      appendChatHtml(`${prefix} <a href="${msg.content}" target="_blank">[文件] ${msg.content.split('/').pop()}</a>`, isMine ? 'sent' : 'received', msg.id);
     } else {
-      appendChat(`[ID:${msg.id}] [用户${msg.senderId} -> 我] ${msg.content}`, 'received');
+      appendChat(`${prefix} ${msg.content}`, isMine ? 'sent' : 'received', msg.id);
     }
   });
 
@@ -407,7 +426,15 @@ function connectWs() {
   });
 
   socket.on('message_recall', ({ messageId, senderId }) => {
-    appendChat(`[系统] 用户${senderId} 撤回了一条消息 (ID:${messageId})`);
+    // 在 DOM 中找到原消息并替换为"已撤回"
+    const el = document.querySelector(`[data-msg-id="${messageId}"]`);
+    if (el) {
+      el.innerHTML = `[${new Date().toLocaleTimeString()}] [ID:${messageId}] 用户${senderId} 撤回了一条消息`;
+      el.style.color = '#999';
+      el.style.fontStyle = 'italic';
+    } else {
+      appendChat(`[系统] 用户${senderId} 撤回了一条消息 (ID:${messageId})`);
+    }
   });
 
   socket.on('group_message', (msg) => {
@@ -436,6 +463,32 @@ function sendMsg() {
   if (!receiverId || !content) { alert('请输入接收者ID和消息内容'); return; }
   socket.emit('private_message', { receiverId, content, type: 'text' });
   document.getElementById('msgContent').value = '';
+}
+
+async function sendFile() {
+  if (!socket) { alert('请先连接 WebSocket'); return; }
+  const receiverId = Number(document.getElementById('toUser').value);
+  if (!receiverId) { alert('请输入接收者ID'); return; }
+  const file = document.getElementById('chatFile').files[0];
+  if (!file) { alert('请选择文件'); return; }
+
+  // 1. 上传文件
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(API + '/message/upload', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token },
+    body: form,
+  });
+  const data = await res.json();
+  if (data.code !== 200) { alert(data.msg); return; }
+
+  // 2. 发送消息（content=文件URL, type=image/file）
+  socket.emit('private_message', {
+    receiverId,
+    content: data.data.url,
+    type: data.data.type,
+  });
 }
 
 function markRead() {
@@ -477,10 +530,17 @@ async function recallMsg() {
   });
   const data = await res.json();
   document.getElementById('out7').textContent = JSON.stringify(data, null, 2);
-  // 通过 WebSocket 通知对方
+  // 通过 WebSocket 通知对方，并更新本地 DOM
   if (data.code === 200 && socket) {
     socket.emit('message_recall', { messageId, receiverId: data.data.receiverId });
-    appendChat(`[系统] 已撤回消息 ID:${messageId}`);
+    const el = document.querySelector(`[data-msg-id="${messageId}"]`);
+    if (el) {
+      el.innerHTML = `[${new Date().toLocaleTimeString()}] [ID:${messageId}] 你撤回了一条消息`;
+      el.style.color = '#999';
+      el.style.fontStyle = 'italic';
+    } else {
+      appendChat(`[系统] 已撤回消息 ID:${messageId}`);
+    }
   }
 }
 
