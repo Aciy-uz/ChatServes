@@ -2,6 +2,8 @@
 
 基于 Express + MySQL + Socket.io 的即时通讯后端服务，支持私聊、群聊、好友管理、消息撤回等功能。
 
+> 前端项目（Electron 桌面端）：[chatDesktop](https://github.com/Aciy-uz/chatDesktop)
+
 ## 技术栈
 
 - **运行时**：Node.js
